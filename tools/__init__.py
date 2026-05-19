@@ -318,6 +318,52 @@ TOOLS = [
         },
     },
 
+    # --- Broadcasts ---
+    {
+        "type": "function",
+        "function": {
+            "name": "prepare_broadcast",
+            "description": "Prepare a broadcast message to multiple contacts. Returns preview of recipients. Use before send_broadcast.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "message": {"type": "string", "description": "Message text to send"},
+                    "group_id": {"type": "string", "description": "Send to contacts in this group"},
+                    "tag": {"type": "string", "description": "Send to contacts with this tag (e.g. 'clients', 'team')"},
+                },
+                "required": ["message"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "confirm_broadcast",
+            "description": "Confirm and send a prepared broadcast. Call after prepare_broadcast when user confirms.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "broadcast_id": {"type": "string", "description": "Broadcast ID from prepare_broadcast"},
+                },
+                "required": ["broadcast_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_broadcast_history",
+            "description": "Get history of sent broadcasts.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "description": "Number of records (default 10)"},
+                },
+                "required": [],
+            },
+        },
+    },
+
     # --- Integrations ---
     {
         "type": "function",

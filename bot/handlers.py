@@ -24,7 +24,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     history = get_history(user_id)
     save_message(user_id, "user", text)
 
-    response = await run_agent(user_id, text, history)
+    response = await run_agent(user_id, text, history, bot=context.bot)
 
     save_message(user_id, "assistant", response)
     await update.message.reply_text(response)
@@ -58,7 +58,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     history = get_history(user_id)
     save_message(user_id, "user", user_message)
 
-    response = await run_agent(user_id, user_message, history)
+    response = await run_agent(user_id, user_message, history, bot=context.bot)
     save_message(user_id, "assistant", response)
     await update.message.reply_text(response)
 
@@ -123,14 +123,19 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
-        "Привет! Я твой личный ИИ-ассистент. Могу:\n"
-        "• Отвечать на вопросы\n"
-        "• Записывать тебя на приём\n"
-        "• Заполнять формы на сайтах\n"
-        "• Работать с файлами и фото\n"
-        "• Интегрироваться с твоими сервисами\n\n"
-        "Команды:\n"
-        "/clear — очистить историю диалога\n\n"
+        "Привет! Я твой личный ИИ-ассистент.\n\n"
+        "📋 Задачи и планирование:\n"
+        "• «Запиши задачу: ...»\n"
+        "• «Что у меня сегодня?»\n"
+        "• «Напомни завтра в 10...»\n\n"
+        "👥 Контакты и рассылки:\n"
+        "• «Добавь контакт: Иван, +7...»\n"
+        "• «Разошли клиентам: ...»\n\n"
+        "🌐 Действия в интернете:\n"
+        "• «Запиши меня к врачу»\n"
+        "• «Заполни форму на сайте»\n\n"
+        "📄 Файлы и фото — просто отправь\n\n"
+        "/clear — очистить историю\n\n"
         "Просто напиши что нужно!"
     )
 

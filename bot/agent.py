@@ -12,6 +12,7 @@ from tools.contacts import (
     add_contact, list_contacts, get_contact, update_contact, delete_contact,
     create_contact_group, list_contact_groups, add_contact_to_group, get_group_contacts
 )
+from tools.broadcast import prepare_broadcast, confirm_broadcast, get_broadcast_history
 from system_prompt import get_system_prompt
 
 client = AsyncOpenAI(api_key=BOTHUB_API_KEY, base_url=BOTHUB_BASE_URL)
@@ -19,7 +20,7 @@ client = AsyncOpenAI(api_key=BOTHUB_API_KEY, base_url=BOTHUB_BASE_URL)
 MAX_TOOL_ROUNDS = 10
 
 
-async def _execute_tool(tool_name: str, args: dict, user_id: str) -> str:
+async def _execute_tool(tool_name: str, args: dict, user_id: str, bot=None) -> str:
     # --- Memory ---
     if tool_name == "save_memory":
         return save_memory(user_id, args["key"], args["value"])
@@ -101,6 +102,26 @@ async def _execute_tool(tool_name: str, args: dict, user_id: str) -> str:
         result = list_contact_groups(user_id)
         return json.dumps(result, ensure_ascii=False) if result else "[]"
 
+    # --- Broadcasts ---
+    if tool_name == "prepare_broadcast":
+        result = prepare_broadcast(
+            user_id,
+            args["message"],
+            group_id=args.get("group_id"),
+            tag=args.get("tag")
+        )
+        return json.dumps(result, ensure_ascii=False)
+
+    if tool_name == "confirm_broadcast":
+        if not bot:
+            return json.dumps({"status": "error", "error": "Bot not available for broadcast"})
+        result = await confirm_broadcast(bot, user_id, args["broadcast_id"])
+        return json.dumps(result, ensure_ascii=False)
+
+    if tool_name == "get_broadcast_history":
+        result = get_broadcast_history(user_id, args.get("limit", 10))
+        return json.dumps(result, ensure_ascii=False) if result else "[]"
+
     # --- Browser ---
     if tool_name == "browser_navigate":
         result = await browser_navigate(args["url"])
@@ -168,7 +189,7 @@ def _make_vision_message(role: str, content: str, screenshot_b64: str | None = N
     return {"role": role, "content": content}
 
 
-async def run_agent(user_id: str, user_message: str, history: list[dict]) -> str:
+async def run_agent(user_id: str, user_message: str, history: list[dict], bot=None) -> str:
     memory = read_memory(user_id)
     integrations = list_integrations_for_user(user_id)
     system_prompt = get_system_prompt(memory, integrations)
@@ -197,7 +218,7 @@ async def run_agent(user_id: str, user_message: str, history: list[dict]) -> str
             tool_name = tool_call.function.name
             args = json.loads(tool_call.function.arguments)
 
-            tool_result = await _execute_tool(tool_name, args, user_id)
+            tool_result = await _execute_tool(tool_name, args, user_id, bot)
 
             screenshot_b64 = None
             try:
