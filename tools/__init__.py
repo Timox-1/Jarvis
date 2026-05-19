@@ -1,4 +1,5 @@
 TOOLS = [
+    # --- Web Search ---
     {
         "type": "function",
         "function": {
@@ -20,6 +21,8 @@ TOOLS = [
             },
         },
     },
+
+    # --- Memory ---
     {
         "type": "function",
         "function": {
@@ -49,6 +52,206 @@ TOOLS = [
             },
         },
     },
+
+    # --- Tasks/TODO ---
+    {
+        "type": "function",
+        "function": {
+            "name": "add_task",
+            "description": "Add a task to user's TODO list. Use for any task, meeting prep, follow-up, etc.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string", "description": "Task title/description"},
+                    "due_date": {"type": "string", "description": "Due date in YYYY-MM-DD format (optional)"},
+                    "due_time": {"type": "string", "description": "Due time in HH:MM format (optional)"},
+                    "priority": {
+                        "type": "string",
+                        "enum": ["low", "normal", "high", "urgent"],
+                        "description": "Priority level (default: normal)"
+                    },
+                    "description": {"type": "string", "description": "Detailed description (optional)"},
+                },
+                "required": ["title"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_tasks",
+            "description": "List user's tasks. Use for 'what do I have today', 'my tasks', 'what's planned'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "date_filter": {
+                        "type": "string",
+                        "description": "'today', 'tomorrow', 'week', or specific date YYYY-MM-DD"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": ["pending", "in_progress", "done"],
+                        "description": "Filter by status"
+                    },
+                    "include_completed": {"type": "boolean", "description": "Include completed tasks (default: false)"},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "complete_task",
+            "description": "Mark a task as completed.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task_id": {"type": "string", "description": "Task UUID to complete"},
+                },
+                "required": ["task_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_task",
+            "description": "Delete a task from the list.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task_id": {"type": "string", "description": "Task UUID to delete"},
+                },
+                "required": ["task_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_today_summary",
+            "description": "Get a summary of today: tasks, overdue items, reminders. Use for 'what's on my plate', 'brief me', 'morning summary'.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        },
+    },
+
+    # --- Contacts ---
+    {
+        "type": "function",
+        "function": {
+            "name": "add_contact",
+            "description": "Add a contact to the address book. Use when user mentions a new person with details.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Contact's full name"},
+                    "phone": {"type": "string", "description": "Phone number"},
+                    "email": {"type": "string", "description": "Email address"},
+                    "telegram_username": {"type": "string", "description": "Telegram username (for broadcasts)"},
+                    "company": {"type": "string", "description": "Company name"},
+                    "role": {"type": "string", "description": "Job title/role"},
+                    "notes": {"type": "string", "description": "Any notes about the contact"},
+                    "tags": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Tags for grouping, e.g. ['client', 'vip']"
+                    },
+                },
+                "required": ["name"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_contacts",
+            "description": "List contacts from address book. Search by name or filter by tag.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "search": {"type": "string", "description": "Search by name"},
+                    "tag": {"type": "string", "description": "Filter by tag"},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_contact_group",
+            "description": "Create a group for organizing contacts (e.g. 'Clients', 'Team', 'VIP').",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Group name"},
+                    "description": {"type": "string", "description": "Group description"},
+                },
+                "required": ["name"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_contact_groups",
+            "description": "List all contact groups.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        },
+    },
+
+    # --- Reminders ---
+    {
+        "type": "function",
+        "function": {
+            "name": "set_reminder",
+            "description": "Set a reminder for the user. Will send a message at the specified time.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string", "description": "Reminder text to send to the user"},
+                    "fire_at": {
+                        "type": "string",
+                        "description": "ISO 8601 datetime with timezone when to fire, e.g. '2026-05-19T15:00:00+03:00' for MSK",
+                    },
+                },
+                "required": ["text", "fire_at"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_reminders",
+            "description": "List all pending (not yet fired) reminders for the user",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_reminder",
+            "description": "Cancel and delete a reminder by its ID",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "reminder_id": {"type": "string", "description": "UUID of the reminder to delete"},
+                },
+                "required": ["reminder_id"],
+            },
+        },
+    },
+
+    # --- Browser ---
     {
         "type": "function",
         "function": {
@@ -114,46 +317,8 @@ TOOLS = [
             "parameters": {"type": "object", "properties": {}, "required": []},
         },
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "set_reminder",
-            "description": "Set a reminder for the user. Will send a message at the specified time.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "text": {"type": "string", "description": "Reminder text to send to the user"},
-                    "fire_at": {
-                        "type": "string",
-                        "description": "ISO 8601 datetime with timezone when to fire, e.g. '2026-05-19T15:00:00+03:00' for MSK",
-                    },
-                },
-                "required": ["text", "fire_at"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "list_reminders",
-            "description": "List all pending (not yet fired) reminders for the user",
-            "parameters": {"type": "object", "properties": {}, "required": []},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "delete_reminder",
-            "description": "Cancel and delete a reminder by its ID",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "reminder_id": {"type": "string", "description": "UUID of the reminder to delete"},
-                },
-                "required": ["reminder_id"],
-            },
-        },
-    },
+
+    # --- Integrations ---
     {
         "type": "function",
         "function": {

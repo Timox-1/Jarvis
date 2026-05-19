@@ -7,6 +7,11 @@ from tools.browser import browser_navigate, browser_click, browser_type, browser
 from tools.n8n import call_integration, list_integrations_for_user
 from tools.reminders import set_reminder, list_reminders, delete_reminder
 from tools.search import web_search
+from tools.tasks import add_task, list_tasks, complete_task, delete_task, get_today_summary
+from tools.contacts import (
+    add_contact, list_contacts, get_contact, update_contact, delete_contact,
+    create_contact_group, list_contact_groups, add_contact_to_group, get_group_contacts
+)
 from system_prompt import get_system_prompt
 
 client = AsyncOpenAI(api_key=BOTHUB_API_KEY, base_url=BOTHUB_BASE_URL)
@@ -15,12 +20,14 @@ MAX_TOOL_ROUNDS = 10
 
 
 async def _execute_tool(tool_name: str, args: dict, user_id: str) -> str:
+    # --- Memory ---
     if tool_name == "save_memory":
         return save_memory(user_id, args["key"], args["value"])
 
     if tool_name == "forget_memory":
         return forget_memory(user_id, args["key"])
 
+    # --- Reminders ---
     if tool_name == "set_reminder":
         return set_reminder(user_id, args["text"], args["fire_at"])
 
@@ -31,6 +38,70 @@ async def _execute_tool(tool_name: str, args: dict, user_id: str) -> str:
     if tool_name == "delete_reminder":
         return delete_reminder(user_id, args["reminder_id"])
 
+    # --- Tasks ---
+    if tool_name == "add_task":
+        return add_task(
+            user_id,
+            args["title"],
+            description=args.get("description"),
+            due_date=args.get("due_date"),
+            due_time=args.get("due_time"),
+            priority=args.get("priority", "normal")
+        )
+
+    if tool_name == "list_tasks":
+        result = list_tasks(
+            user_id,
+            status=args.get("status"),
+            date_filter=args.get("date_filter"),
+            include_completed=args.get("include_completed", False)
+        )
+        return json.dumps(result, ensure_ascii=False) if result else "[]"
+
+    if tool_name == "complete_task":
+        return complete_task(user_id, args["task_id"])
+
+    if tool_name == "delete_task":
+        return delete_task(user_id, args["task_id"])
+
+    if tool_name == "get_today_summary":
+        result = get_today_summary(user_id)
+        return json.dumps(result, ensure_ascii=False)
+
+    # --- Contacts ---
+    if tool_name == "add_contact":
+        return add_contact(
+            user_id,
+            args["name"],
+            phone=args.get("phone"),
+            email=args.get("email"),
+            telegram_username=args.get("telegram_username"),
+            company=args.get("company"),
+            role=args.get("role"),
+            notes=args.get("notes"),
+            tags=args.get("tags")
+        )
+
+    if tool_name == "list_contacts":
+        result = list_contacts(
+            user_id,
+            search=args.get("search"),
+            tag=args.get("tag")
+        )
+        return json.dumps(result, ensure_ascii=False) if result else "[]"
+
+    if tool_name == "create_contact_group":
+        return create_contact_group(
+            user_id,
+            args["name"],
+            description=args.get("description")
+        )
+
+    if tool_name == "list_contact_groups":
+        result = list_contact_groups(user_id)
+        return json.dumps(result, ensure_ascii=False) if result else "[]"
+
+    # --- Browser ---
     if tool_name == "browser_navigate":
         result = await browser_navigate(args["url"])
         if result["status"] == "error":
@@ -65,6 +136,7 @@ async def _execute_tool(tool_name: str, args: dict, user_id: str) -> str:
             return f"Get text error: {result['error']}"
         return result["text"]
 
+    # --- Integrations ---
     if tool_name == "list_integrations":
         result = list_integrations_for_user(user_id)
         return json.dumps(result) if result else "[]"
@@ -73,6 +145,7 @@ async def _execute_tool(tool_name: str, args: dict, user_id: str) -> str:
         result = await call_integration(user_id, args["integration_type"], args.get("payload", {}))
         return json.dumps(result)
 
+    # --- Search ---
     if tool_name == "web_search":
         result = await web_search(args["query"], args.get("count", 5))
         return json.dumps(result, ensure_ascii=False)
