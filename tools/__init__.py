@@ -162,4 +162,25 @@ TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "web_search",
+            "description": "Search the web for information. Returns titles, URLs and snippets. Use this BEFORE browser_navigate to find relevant pages. Faster and safer than opening random URLs.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Search query in natural language",
+                    },
+                    "count": {
+                        "type": "integer",
+                        "description": "Number of results (1-10, default 5)",
+                    },
+                },
+                "required": ["query"],
+            },
+        },
+    },
 ]

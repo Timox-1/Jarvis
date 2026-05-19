@@ -11,6 +11,9 @@ GPT_MODEL = "gpt-4o"
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 
+# Brave Search API (free tier: 2000 requests/month)
+BRAVE_API_KEY = os.getenv("BRAVE_API_KEY", "")
+
 ADMIN_TELEGRAM_IDS = [
     int(x) for x in os.getenv("ADMIN_TELEGRAM_IDS", "").split(",") if x
 ]
