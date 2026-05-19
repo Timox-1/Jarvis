@@ -96,8 +96,16 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "list_integrations",
+            "description": "Get list of available integrations configured for this user (CRM, calendar, etc.). Call this first before call_integration to see what's available.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "call_integration",
-            "description": "Call an external integration (CRM, calendar, etc.) via n8n webhook",
+            "description": "Call an external integration (CRM, calendar, etc.) via n8n webhook. Use list_integrations first to see available types.",
             "parameters": {
                 "type": "object",
                 "properties": {

@@ -4,7 +4,7 @@ from config import BOTHUB_API_KEY, BOTHUB_BASE_URL, GPT_MODEL
 from tools import TOOLS
 from tools.memory import save_memory, forget_memory, read_memory
 from tools.browser import browser_navigate, browser_click, browser_type, browser_press, browser_get_text
-from tools.n8n import call_integration
+from tools.n8n import call_integration, list_integrations_for_user
 from system_prompt import get_system_prompt
 
 client = AsyncOpenAI(api_key=BOTHUB_API_KEY, base_url=BOTHUB_BASE_URL)
@@ -52,6 +52,10 @@ async def _execute_tool(tool_name: str, args: dict, user_id: str) -> str:
         if result["status"] == "error":
             return f"Get text error: {result['error']}"
         return result["text"]
+
+    if tool_name == "list_integrations":
+        result = list_integrations_for_user(user_id)
+        return json.dumps(result) if result else "[]"
 
     if tool_name == "call_integration":
         result = await call_integration(user_id, args["integration_type"], args["payload"])

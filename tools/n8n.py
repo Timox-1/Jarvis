@@ -8,6 +8,11 @@ def get_integrations(user_id: str) -> list[dict]:
     return result.data
 
 
+def list_integrations_for_user(user_id: str) -> list[dict]:
+    integrations = get_integrations(user_id)
+    return [{"type": i["type"], "config": i.get("config") or {}} for i in integrations]
+
+
 async def call_integration(user_id: str, integration_type: str, payload: dict) -> dict:
     integrations = get_integrations(user_id)
     target = next((i for i in integrations if i["type"] == integration_type), None)
