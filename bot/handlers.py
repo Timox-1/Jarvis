@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from telegram import Update
 from telegram.ext import ContextTypes
-from tools.memory import get_or_create_user, is_user_allowed, save_message, get_history
+from tools.memory import get_or_create_user, is_user_allowed, save_message, get_history, clear_history
 from tools.files import get_file_text
 from bot.agent import run_agent
 
@@ -129,5 +129,18 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "• Заполнять формы на сайтах\n"
         "• Работать с файлами и фото\n"
         "• Интегрироваться с твоими сервисами\n\n"
+        "Команды:\n"
+        "/clear — очистить историю диалога\n\n"
         "Просто напиши что нужно!"
     )
+
+
+async def handle_clear(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    if not is_user_allowed(user.id):
+        await update.message.reply_text("Доступ закрыт.")
+        return
+
+    user_id = get_or_create_user(user.id, user.full_name)
+    count = clear_history(user_id)
+    await update.message.reply_text(f"История очищена ({count} сообщений удалено). Начинаем с чистого листа!")
