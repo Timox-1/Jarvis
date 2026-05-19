@@ -2,6 +2,27 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "web_search",
+            "description": "Search the web for current information (weather, news, prices, events, facts). ALWAYS use this for info lookups — do NOT use browser for searches. Returns titles, URLs and snippets instantly without captchas.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Search query in natural language",
+                    },
+                    "count": {
+                        "type": "integer",
+                        "description": "Number of results (1-10, default 5)",
+                    },
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "save_memory",
             "description": "Save a fact about the user to long-term memory. Use when user tells you something important about themselves (name, preferences, contacts, doctor, car, etc.)",
             "parameters": {
@@ -159,27 +180,6 @@ TOOLS = [
                     },
                 },
                 "required": ["integration_type"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "web_search",
-            "description": "Search the web for information. Returns titles, URLs and snippets. Use this BEFORE browser_navigate to find relevant pages. Faster and safer than opening random URLs.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Search query in natural language",
-                    },
-                    "count": {
-                        "type": "integer",
-                        "description": "Number of results (1-10, default 5)",
-                    },
-                },
-                "required": ["query"],
             },
         },
     },

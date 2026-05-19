@@ -143,4 +143,9 @@ async def handle_clear(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     user_id = get_or_create_user(user.id, user.full_name)
     count = clear_history(user_id)
-    await update.message.reply_text(f"История очищена ({count} сообщений удалено). Начинаем с чистого листа!")
+
+    # Also close browser session
+    from tools.browser import browser_close
+    await browser_close()
+
+    await update.message.reply_text(f"История очищена ({count} сообщений удалено). Браузер сброшен. Начинаем с чистого листа!")
