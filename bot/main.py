@@ -1,7 +1,7 @@
 import asyncio
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
 from config import TELEGRAM_TOKEN
-from bot.handlers import handle_message, handle_document, handle_photo, handle_start, handle_clear
+from bot.handlers import handle_message, handle_document, handle_photo, handle_start, handle_clear, handle_connect_calendar
 from tools.reminders import check_and_fire_reminders
 
 
@@ -26,6 +26,7 @@ def main() -> None:
 
     app.add_handler(CommandHandler("start", handle_start))
     app.add_handler(CommandHandler("clear", handle_clear))
+    app.add_handler(CommandHandler("connect_calendar", handle_connect_calendar))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))

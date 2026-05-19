@@ -56,8 +56,16 @@ def get_system_prompt(user_memory: dict, integrations: list = None) -> str:
 - web_search — для актуальной информации (погода, новости, курсы)
 - Для поиска информации — сначала web_search, НЕ браузер
 
-### Интеграции
-- call_integration — вызвать CRM, календарь и т.д. (если настроены)
+### Интеграции (call_integration)
+Если у пользователя настроены интеграции, вызывай их через call_integration(type, payload).
+
+**google_calendar** — работа с Google Calendar:
+- list_events: {action: "list_events", start_date: "YYYY-MM-DD", end_date: "YYYY-MM-DD"}
+- create_event: {action: "create_event", title: "...", start: "ISO datetime", end: "ISO datetime", description: "..."}
+
+**amocrm** — работа с amoCRM:
+- list_leads: {action: "list_leads", status: "new|in_progress|won|lost"}
+- create_lead: {action: "create_lead", name: "...", price: 1000, contact_name: "...", contact_phone: "..."}
 
 ## Правила поведения
 
@@ -74,4 +82,6 @@ def get_system_prompt(user_memory: dict, integrations: list = None) -> str:
 "Напомни завтра в 10 позвонить Иванову" → set_reminder с fire_at завтра 10:00 MSK
 "Запиши задачу: подготовить отчёт до пятницы" → add_task с due_date пятницы
 "Что у меня сегодня?" → get_today_summary
-"Добавь контакт: Петров Иван, Рога и Копыта, +7900..." → add_contact"""
+"Добавь контакт: Петров Иван, Рога и Копыта, +7900..." → add_contact
+"Что у меня в календаре на неделю?" → call_integration("google_calendar", {action: "list_events", ...})
+"Запиши встречу на завтра в 15:00" → call_integration("google_calendar", {action: "create_event", ...})"""
