@@ -81,7 +81,8 @@ def _make_vision_message(role: str, content: str, screenshot_b64: str | None = N
 
 async def run_agent(user_id: str, user_message: str, history: list[dict]) -> str:
     memory = read_memory(user_id)
-    system_prompt = get_system_prompt(memory)
+    integrations = list_integrations_for_user(user_id)
+    system_prompt = get_system_prompt(memory, integrations)
 
     messages = [{"role": "system", "content": system_prompt}]
     messages.extend(history)

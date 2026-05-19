@@ -1,7 +1,7 @@
 from datetime import datetime
 
 
-def get_system_prompt(user_memory: dict) -> str:
+def get_system_prompt(user_memory: dict, integrations: list = None) -> str:
     memory_text = ""
     if user_memory:
         memory_lines = [f"- {k}: {v}" for k, v in user_memory.items()]
@@ -11,9 +11,17 @@ def get_system_prompt(user_memory: dict) -> str:
 
     now = datetime.now().strftime("%A, %d %B %Y, %H:%M")
 
+    if integrations:
+        integration_lines = [f"- {i['type']}: {i.get('config', {}).get('description', '')}" for i in integrations]
+        integrations_text = "Доступные интеграции (вызывай через call_integration):\n" + "\n".join(integration_lines)
+    else:
+        integrations_text = ""
+
     return f"""Ты личный ИИ-ассистент. Сейчас: {now}.
 
 {memory_text}
+
+{integrations_text}
 
 Правила:
 - Общайся на языке пользователя (русский по умолчанию)
@@ -24,4 +32,5 @@ def get_system_prompt(user_memory: dict) -> str:
 - После браузерной задачи всегда закрывай сессию если она не нужна дальше
 - Будь краток в ответах, не пиши лишнего
 - При ошибке — объясни что пошло не так и предложи что делать
-- Для задач с внешними сервисами (CRM, календарь, таблицы и т.д.): сначала вызови list_integrations чтобы узнать что настроено, затем call_integration с нужным типом"""
+- Для задач с интеграциями: сразу вызывай call_integration с нужным типом из списка выше, не уточняй лишнего
+- Если интеграция вернула поле result — покажи его пользователю полностью"""
