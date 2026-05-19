@@ -34,4 +34,5 @@ RUN playwright install chromium
 COPY . .
 RUN mkdir -p downloads
 
+ENV PYTHONUNBUFFERED=1
 CMD ["python", "-m", "bot.main"]
