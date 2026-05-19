@@ -96,6 +96,46 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "set_reminder",
+            "description": "Set a reminder for the user. Will send a message at the specified time.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string", "description": "Reminder text to send to the user"},
+                    "fire_at": {
+                        "type": "string",
+                        "description": "ISO 8601 datetime with timezone when to fire, e.g. '2026-05-19T15:00:00+03:00' for MSK",
+                    },
+                },
+                "required": ["text", "fire_at"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_reminders",
+            "description": "List all pending (not yet fired) reminders for the user",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_reminder",
+            "description": "Cancel and delete a reminder by its ID",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "reminder_id": {"type": "string", "description": "UUID of the reminder to delete"},
+                },
+                "required": ["reminder_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "list_integrations",
             "description": "Get list of available integrations configured for this user (CRM, calendar, etc.). Call this first before call_integration to see what's available.",
             "parameters": {"type": "object", "properties": {}, "required": []},

@@ -1,4 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+MOSCOW_TZ = timezone(timedelta(hours=3))
 
 
 def get_system_prompt(user_memory: dict, integrations: list = None) -> str:
@@ -9,7 +11,7 @@ def get_system_prompt(user_memory: dict, integrations: list = None) -> str:
     else:
         memory_text = "О пользователе пока ничего не известно."
 
-    now = datetime.now().strftime("%A, %d %B %Y, %H:%M")
+    now = datetime.now(MOSCOW_TZ).strftime("%A, %d %B %Y, %H:%M (MSK, UTC+3)")
 
     if integrations:
         integration_lines = [f"- {i['type']}: {i.get('config', {}).get('description', '')}" for i in integrations]
@@ -33,4 +35,5 @@ def get_system_prompt(user_memory: dict, integrations: list = None) -> str:
 - Будь краток в ответах, не пиши лишнего
 - При ошибке — объясни что пошло не так и предложи что делать
 - Для задач с интеграциями: сразу вызывай call_integration с нужным типом из списка выше, не уточняй лишнего
-- Если интеграция вернула поле result — покажи его пользователю полностью"""
+- Если интеграция вернула поле result — покажи его пользователю полностью
+- Для напоминаний: используй fire_at в формате ISO 8601 с MSK-смещением (+03:00), рассчитывай от текущего времени из system prompt"""

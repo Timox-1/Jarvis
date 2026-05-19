@@ -5,6 +5,7 @@ from tools import TOOLS
 from tools.memory import save_memory, forget_memory, read_memory
 from tools.browser import browser_navigate, browser_click, browser_type, browser_press, browser_get_text
 from tools.n8n import call_integration, list_integrations_for_user
+from tools.reminders import set_reminder, list_reminders, delete_reminder
 from system_prompt import get_system_prompt
 
 client = AsyncOpenAI(api_key=BOTHUB_API_KEY, base_url=BOTHUB_BASE_URL)
@@ -18,6 +19,16 @@ async def _execute_tool(tool_name: str, args: dict, user_id: str) -> str:
 
     if tool_name == "forget_memory":
         return forget_memory(user_id, args["key"])
+
+    if tool_name == "set_reminder":
+        return set_reminder(user_id, args["text"], args["fire_at"])
+
+    if tool_name == "list_reminders":
+        result = list_reminders(user_id)
+        return json.dumps(result, ensure_ascii=False) if result else "[]"
+
+    if tool_name == "delete_reminder":
+        return delete_reminder(user_id, args["reminder_id"])
 
     if tool_name == "browser_navigate":
         result = await browser_navigate(args["url"])
