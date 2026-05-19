@@ -21,7 +21,7 @@ async def call_integration(user_id: str, integration_type: str, payload: dict) -
             "status": "error",
             "error": f"Integration '{integration_type}' not configured for this user",
         }
-    async with httpx.AsyncClient(timeout=30) as client:
+    async with httpx.AsyncClient(timeout=60) as client:
         try:
             response = await client.post(
                 target["webhook_url"],
