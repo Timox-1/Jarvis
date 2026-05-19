@@ -118,7 +118,7 @@ TOOLS = [
                         "description": "Data to send to the integration",
                     },
                 },
-                "required": ["integration_type", "payload"],
+                "required": ["integration_type"],
             },
         },
     },

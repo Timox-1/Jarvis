@@ -58,7 +58,7 @@ async def _execute_tool(tool_name: str, args: dict, user_id: str) -> str:
         return json.dumps(result) if result else "[]"
 
     if tool_name == "call_integration":
-        result = await call_integration(user_id, args["integration_type"], args["payload"])
+        result = await call_integration(user_id, args["integration_type"], args.get("payload", {}))
         return json.dumps(result)
 
     return f"Unknown tool: {tool_name}"
