@@ -131,11 +131,14 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "👥 Контакты и рассылки:\n"
         "• «Добавь контакт: Иван, +7...»\n"
         "• «Разошли клиентам: ...»\n\n"
+        "📅 Яндекс Календарь:\n"
+        "• «Что у меня в календаре на неделе?»\n"
+        "• «Запиши встречу на завтра в 15:00»\n\n"
         "🌐 Действия в интернете:\n"
         "• «Запиши меня к врачу»\n"
         "• «Заполни форму на сайте»\n\n"
         "📄 Файлы и фото — просто отправь\n\n"
-        "/connect_calendar — подключить Google Calendar\n"
+        "/connect_calendar — подключить Яндекс Календарь\n"
         "/clear — очистить историю\n\n"
         "Просто напиши что нужно!"
     )
@@ -150,7 +153,6 @@ async def handle_clear(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     user_id = get_or_create_user(user.id, user.full_name)
     count = clear_history(user_id)
 
-    # Also close browser session
     from tools.browser import browser_close
     await browser_close()
 
@@ -163,11 +165,20 @@ async def handle_connect_calendar(update: Update, context: ContextTypes.DEFAULT_
         await update.message.reply_text("Доступ закрыт.")
         return
 
+    from config import YANDEX_CALENDAR_CLIENT_ID
     user_id = get_or_create_user(user.id, user.full_name)
-    oauth_url = f"https://n8n.kampaner.ru/webhook/oauth-google-start?user_id={user_id}"
+
+    oauth_url = (
+        "https://oauth.yandex.ru/authorize"
+        f"?client_id={YANDEX_CALENDAR_CLIENT_ID}"
+        "&response_type=code"
+        "&scope=calendar:all+login:email+login:info"
+        f"&state={user_id}"
+        "&force_confirm=yes"
+    )
 
     await update.message.reply_text(
-        "📅 Подключение Google Calendar\n\n"
-        f"Нажмите на ссылку и войдите в Google:\n{oauth_url}\n\n"
-        "После успешного входа вернитесь сюда."
+        "📅 Подключение Яндекс Календаря\n\n"
+        f"Нажми на ссылку и войди в Яндекс:\n{oauth_url}\n\n"
+        "После входа вернись сюда — бот подтвердит подключение."
     )
