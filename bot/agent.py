@@ -13,6 +13,7 @@ from tools.contacts import (
     create_contact_group, list_contact_groups, add_contact_to_group, get_group_contacts
 )
 from tools.broadcast import prepare_broadcast, confirm_broadcast, get_broadcast_history
+from tools.calendar import list_events, create_event, delete_event
 from system_prompt import get_system_prompt
 
 client = AsyncOpenAI(api_key=BOTHUB_API_KEY, base_url=BOTHUB_BASE_URL)
@@ -121,6 +122,32 @@ async def _execute_tool(tool_name: str, args: dict, user_id: str, bot=None) -> s
     if tool_name == "get_broadcast_history":
         result = get_broadcast_history(user_id, args.get("limit", 10))
         return json.dumps(result, ensure_ascii=False) if result else "[]"
+
+    # --- Calendar ---
+    if tool_name == "list_events":
+        try:
+            result = list_events(user_id, args["start_date"], args["end_date"])
+            return json.dumps(result, ensure_ascii=False)
+        except ValueError as e:
+            return str(e)
+
+    if tool_name == "create_event":
+        try:
+            return create_event(
+                user_id,
+                args["title"],
+                args["start"],
+                args["end"],
+                description=args.get("description", "")
+            )
+        except ValueError as e:
+            return str(e)
+
+    if tool_name == "delete_event":
+        try:
+            return delete_event(user_id, args["event_uid"])
+        except ValueError as e:
+            return str(e)
 
     # --- Browser ---
     if tool_name == "browser_navigate":
