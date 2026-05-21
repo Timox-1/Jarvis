@@ -444,6 +444,54 @@ TOOLS = [
         },
     },
 
+    # --- Email ---
+    {
+        "type": "function",
+        "function": {
+            "name": "list_emails",
+            "description": "List recent emails from Yandex Mail. Use when user says 'покажи письма', 'что в почте', 'новые письма'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "folder": {"type": "string", "description": "IMAP папка, по умолчанию INBOX"},
+                    "limit": {"type": "integer", "description": "Количество писем, по умолчанию 10"},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "read_email",
+            "description": "Read full email body by ID from list_emails.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "email_id": {"type": "string", "description": "ID письма из list_emails"},
+                    "folder": {"type": "string", "description": "IMAP папка, по умолчанию INBOX"},
+                },
+                "required": ["email_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "send_email",
+            "description": "Send email via Yandex Mail. Use when user says 'напиши письмо', 'отправь email'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "to": {"type": "string", "description": "Email получателя"},
+                    "subject": {"type": "string", "description": "Тема письма"},
+                    "body": {"type": "string", "description": "Текст письма"},
+                },
+                "required": ["to", "subject", "body"],
+            },
+        },
+    },
+
     # --- Contact Notes ---
     {
         "type": "function",

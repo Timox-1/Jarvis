@@ -16,6 +16,7 @@ from tools.broadcast import prepare_broadcast, confirm_broadcast, get_broadcast_
 from tools.calendar import list_events, create_event, delete_event
 from tools.expenses import add_expense, list_expenses, get_expense_summary
 from tools.contact_notes import add_contact_note, list_contact_notes
+from tools.email import list_emails, read_email, send_email
 from system_prompt import get_system_prompt
 
 client = AsyncOpenAI(api_key=BOTHUB_API_KEY, base_url=BOTHUB_BASE_URL)
@@ -148,6 +149,27 @@ async def _execute_tool(tool_name: str, args: dict, user_id: str, bot=None) -> s
     if tool_name == "delete_event":
         try:
             return delete_event(user_id, args["event_uid"])
+        except ValueError as e:
+            return str(e)
+
+    # --- Email ---
+    if tool_name == "list_emails":
+        try:
+            result = list_emails(user_id, folder=args.get("folder", "INBOX"), limit=args.get("limit", 10))
+            return json.dumps(result, ensure_ascii=False)
+        except ValueError as e:
+            return str(e)
+
+    if tool_name == "read_email":
+        try:
+            result = read_email(user_id, args["email_id"], folder=args.get("folder", "INBOX"))
+            return json.dumps(result, ensure_ascii=False)
+        except ValueError as e:
+            return str(e)
+
+    if tool_name == "send_email":
+        try:
+            return send_email(user_id, args["to"], args["subject"], args["body"])
         except ValueError as e:
             return str(e)
 
