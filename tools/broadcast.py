@@ -103,6 +103,7 @@ async def confirm_broadcast(
         }
 
     broadcast_data = broadcast.data[0]
+    broadcast_id = broadcast_data["id"]  # always use the real ID from DB
     message = broadcast_data["message"]
 
     # Get contacts again
