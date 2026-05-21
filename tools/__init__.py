@@ -152,7 +152,8 @@ TOOLS = [
                     "name": {"type": "string", "description": "Contact's full name"},
                     "phone": {"type": "string", "description": "Phone number"},
                     "email": {"type": "string", "description": "Email address"},
-                    "telegram_username": {"type": "string", "description": "Telegram username (for broadcasts)"},
+                    "telegram_id": {"type": "integer", "description": "Numeric Telegram user ID (required for broadcasts). Use when user provides a number like 358249169"},
+                    "telegram_username": {"type": "string", "description": "Telegram @username without @. Use only if numeric telegram_id is unknown"},
                     "company": {"type": "string", "description": "Company name"},
                     "role": {"type": "string", "description": "Job title/role"},
                     "notes": {"type": "string", "description": "Any notes about the contact"},
@@ -343,9 +344,9 @@ TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "broadcast_id": {"type": "string", "description": "Broadcast ID from prepare_broadcast"},
+                    "broadcast_id": {"type": "string", "description": "Broadcast ID from prepare_broadcast. If not known, leave empty — will use the latest pending broadcast"},
                 },
-                "required": ["broadcast_id"],
+                "required": [],
             },
         },
     },

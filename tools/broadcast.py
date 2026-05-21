@@ -79,13 +79,22 @@ async def confirm_broadcast(
     """
     db = get_db()
 
-    # Get broadcast record
-    broadcast = (db.table("broadcasts")
-                 .select("*")
-                 .eq("id", broadcast_id)
-                 .eq("user_id", user_id)
-                 .eq("status", "pending_confirmation")
-                 .execute())
+    # Get broadcast record — if no ID, take the latest pending one
+    if broadcast_id:
+        broadcast = (db.table("broadcasts")
+                     .select("*")
+                     .eq("id", broadcast_id)
+                     .eq("user_id", user_id)
+                     .eq("status", "pending_confirmation")
+                     .execute())
+    else:
+        broadcast = (db.table("broadcasts")
+                     .select("*")
+                     .eq("user_id", user_id)
+                     .eq("status", "pending_confirmation")
+                     .order("created_at", desc=True)
+                     .limit(1)
+                     .execute())
 
     if not broadcast.data:
         return {
