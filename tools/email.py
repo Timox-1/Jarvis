@@ -18,20 +18,27 @@ SMTP_PORT = 465
 
 def _get_credentials(user_id: str) -> tuple[str, str]:
     db = get_db()
+
+    # app-password from user_memory
     memory = (db.table("user_memory")
               .select("key, value")
               .eq("user_id", user_id)
-              .in_("key", ["yandex_login", "yandex_app_password"])
+              .eq("key", "yandex_app_password")
               .execute()).data
-    mem = {m["key"]: m["value"] for m in memory}
+    password = memory[0]["value"] if memory else None
 
-    login = mem.get("yandex_login")
-    password = mem.get("yandex_app_password")
+    # yandex_login from user_integrations (set during Calendar OAuth)
+    integration = (db.table("user_integrations")
+                   .select("yandex_login")
+                   .eq("user_id", user_id)
+                   .eq("provider", "yandex_calendar")
+                   .execute()).data
+    login = integration[0]["yandex_login"] if integration else None
 
-    if not login or not password:
-        raise ValueError(
-            "Яндекс app-password не настроен. Скажи мне: «Сохрани мой Яндекс app-password: XXXX-XXXX-XXXX-XXXX»"
-        )
+    if not login:
+        raise ValueError("Яндекс аккаунт не подключён. Используй /connect_calendar")
+    if not password:
+        raise ValueError("Яндекс app-password не настроен. Скажи мне: «Сохрани мой Яндекс app-password: XXXX»")
 
     return login, password
 
