@@ -47,6 +47,12 @@ def get_system_prompt(user_memory: dict, integrations: list = None) -> str:
 - list_contacts — найти контакт
 - create_contact_group — создать группу для рассылок
 
+### Яндекс Календарь
+- list_events — события за период (start_date, end_date в формате YYYY-MM-DD)
+- create_event — создать встречу (title, start/end в ISO с +03:00, длительность по умолчанию 1 час)
+- delete_event — удалить событие по uid (сначала найди через list_events)
+- Если календарь не подключён — предложи /connect_calendar
+
 ### Браузер (для действий на сайтах)
 - browser_navigate — открыть сайт
 - browser_click, browser_type, browser_press — взаимодействие
@@ -59,10 +65,6 @@ def get_system_prompt(user_memory: dict, integrations: list = None) -> str:
 ### Интеграции (call_integration)
 Если у пользователя настроены интеграции, вызывай их через call_integration(type, payload).
 
-**google_calendar** — работа с Google Calendar:
-- list_events: {{action: "list_events", start_date: "YYYY-MM-DD", end_date: "YYYY-MM-DD"}}
-- create_event: {{action: "create_event", title: "...", start: "ISO datetime", end: "ISO datetime", description: "..."}}
-
 **amocrm** — работа с amoCRM:
 - list_leads: {{action: "list_leads", status: "new|in_progress|won|lost"}}
 - create_lead: {{action: "create_lead", name: "...", price: 1000, contact_name: "...", contact_phone: "..."}}
@@ -73,7 +75,7 @@ def get_system_prompt(user_memory: dict, integrations: list = None) -> str:
 2. **Для задач используй add_task**, для напоминалок по времени — set_reminder
 3. **"Что на сегодня"** = get_today_summary
 4. **Краткость** — не пиши лишнего, давай суть
-5. **Даты** — для due_date используй {today_str} как сегодня, для fire_at — полный ISO с +03:00
+5. **Даты** — для due_date используй {today_str} как сегодня, для fire_at и calendar — полный ISO с +03:00
 6. **Контакты** — если пользователь упоминает человека с деталями, предложи сохранить
 7. **Ошибки** — объясни что пошло не так и что делать
 
@@ -83,5 +85,5 @@ def get_system_prompt(user_memory: dict, integrations: list = None) -> str:
 "Запиши задачу: подготовить отчёт до пятницы" → add_task с due_date пятницы
 "Что у меня сегодня?" → get_today_summary
 "Добавь контакт: Петров Иван, Рога и Копыта, +7900..." → add_contact
-"Что у меня в календаре на неделю?" → call_integration("google_calendar", {{action: "list_events", ...}})
-"Запиши встречу на завтра в 15:00" → call_integration("google_calendar", {{action: "create_event", ...}})"""
+"Что у меня в календаре на этой неделе?" → list_events(start_date=сегодня, end_date=+7 дней)
+"Запиши встречу с командой в пятницу в 14:00" → create_event(title="Встреча с командой", start="...T14:00:00+03:00", end="...T15:00:00+03:00")"""
