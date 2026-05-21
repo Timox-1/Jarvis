@@ -121,6 +121,50 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     os.remove(file_path)
 
 
+async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    if not is_user_allowed(user.id):
+        await update.message.reply_text("Доступ закрыт.")
+        return
+
+    user_id = get_or_create_user(user.id, user.full_name)
+    await context.bot.send_chat_action(update.effective_chat.id, "typing")
+
+    voice = update.message.voice
+    file = await context.bot.get_file(voice.file_id)
+    file_path = DOWNLOADS_DIR / f"{voice.file_id}.ogg"
+    await file.download_to_drive(file_path)
+
+    try:
+        from openai import AsyncOpenAI
+        from config import BOTHUB_API_KEY, BOTHUB_BASE_URL
+
+        client = AsyncOpenAI(api_key=BOTHUB_API_KEY, base_url=BOTHUB_BASE_URL)
+        with open(file_path, "rb") as audio_file:
+            transcription = await client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file,
+                language="ru",
+            )
+
+        text = transcription.text.strip()
+        if not text:
+            await update.message.reply_text("Не удалось распознать голос. Попробуй ещё раз.")
+            return
+
+        await update.message.reply_text(f"🎤 {text}")
+
+        history = get_history(user_id)
+        save_message(user_id, "user", text)
+        response = await run_agent(user_id, text, history, bot=context.bot)
+        save_message(user_id, "assistant", response)
+        await update.message.reply_text(response)
+
+    finally:
+        if file_path.exists():
+            os.remove(file_path)
+
+
 async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "Привет! Я твой личный ИИ-ассистент.\n\n"
