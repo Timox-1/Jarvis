@@ -72,3 +72,10 @@ def forget_memory(user_id: str, key: str) -> str:
     db = get_db()
     db.table("user_memory").delete().eq("user_id", user_id).eq("key", key).execute()
     return f"Forgotten: {key}"
+
+
+def clear_history(user_id: str) -> int:
+    """Clear all messages for a user. Returns count of deleted messages."""
+    db = get_db()
+    result = db.table("messages").delete().eq("user_id", user_id).execute()
+    return len(result.data) if result.data else 0

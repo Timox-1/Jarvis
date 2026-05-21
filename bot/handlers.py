@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from telegram import Update
 from telegram.ext import ContextTypes
-from tools.memory import get_or_create_user, is_user_allowed, save_message, get_history
+from tools.memory import get_or_create_user, is_user_allowed, save_message, get_history, clear_history
 from tools.files import get_file_text
 from bot.agent import run_agent
 
@@ -24,7 +24,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     history = get_history(user_id)
     save_message(user_id, "user", text)
 
-    response = await run_agent(user_id, text, history)
+    response = await run_agent(user_id, text, history, bot=context.bot)
 
     save_message(user_id, "assistant", response)
     await update.message.reply_text(response)
@@ -58,7 +58,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     history = get_history(user_id)
     save_message(user_id, "user", user_message)
 
-    response = await run_agent(user_id, user_message, history)
+    response = await run_agent(user_id, user_message, history, bot=context.bot)
     save_message(user_id, "assistant", response)
     await update.message.reply_text(response)
 
@@ -123,11 +123,62 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
-        "Привет! Я твой личный ИИ-ассистент. Могу:\n"
-        "• Отвечать на вопросы\n"
-        "• Записывать тебя на приём\n"
-        "• Заполнять формы на сайтах\n"
-        "• Работать с файлами и фото\n"
-        "• Интегрироваться с твоими сервисами\n\n"
+        "Привет! Я твой личный ИИ-ассистент.\n\n"
+        "📋 Задачи и планирование:\n"
+        "• «Запиши задачу: ...»\n"
+        "• «Что у меня сегодня?»\n"
+        "• «Напомни завтра в 10...»\n\n"
+        "👥 Контакты и рассылки:\n"
+        "• «Добавь контакт: Иван, +7...»\n"
+        "• «Разошли клиентам: ...»\n\n"
+        "📅 Яндекс Календарь:\n"
+        "• «Что у меня в календаре на неделе?»\n"
+        "• «Запиши встречу на завтра в 15:00»\n\n"
+        "🌐 Действия в интернете:\n"
+        "• «Запиши меня к врачу»\n"
+        "• «Заполни форму на сайте»\n\n"
+        "📄 Файлы и фото — просто отправь\n\n"
+        "/connect_calendar — подключить Яндекс Календарь\n"
+        "/clear — очистить историю\n\n"
         "Просто напиши что нужно!"
+    )
+
+
+async def handle_clear(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    if not is_user_allowed(user.id):
+        await update.message.reply_text("Доступ закрыт.")
+        return
+
+    user_id = get_or_create_user(user.id, user.full_name)
+    count = clear_history(user_id)
+
+    from tools.browser import browser_close
+    await browser_close()
+
+    await update.message.reply_text(f"История очищена ({count} сообщений удалено). Браузер сброшен. Начинаем с чистого листа!")
+
+
+async def handle_connect_calendar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    if not is_user_allowed(user.id):
+        await update.message.reply_text("Доступ закрыт.")
+        return
+
+    from config import YANDEX_CALENDAR_CLIENT_ID
+    user_id = get_or_create_user(user.id, user.full_name)
+
+    oauth_url = (
+        "https://oauth.yandex.ru/authorize"
+        f"?client_id={YANDEX_CALENDAR_CLIENT_ID}"
+        "&response_type=code"
+        "&scope=calendar:all+login:email+login:info"
+        f"&state={user_id}"
+        "&force_confirm=yes"
+    )
+
+    await update.message.reply_text(
+        "📅 Подключение Яндекс Календаря\n\n"
+        f"Нажми на ссылку и войди в Яндекс:\n{oauth_url}\n\n"
+        "После входа вернись сюда — бот подтвердит подключение."
     )
