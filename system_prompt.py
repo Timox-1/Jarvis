@@ -1,6 +1,6 @@
 from datetime import datetime, timezone, timedelta
 
-MOSCOW_TZ = timezone(timedelta(hours=3))
+KEMEROVO_TZ = timezone(timedelta(hours=7))
 
 
 def get_system_prompt(user_memory: dict, integrations: list = None) -> str:
@@ -11,8 +11,8 @@ def get_system_prompt(user_memory: dict, integrations: list = None) -> str:
     else:
         memory_text = "О пользователе пока ничего не известно."
 
-    now = datetime.now(MOSCOW_TZ)
-    now_str = now.strftime("%A, %d %B %Y, %H:%M (MSK, UTC+3)")
+    now = datetime.now(KEMEROVO_TZ)
+    now_str = now.strftime("%A, %d %B %Y, %H:%M (Kemerovo, UTC+7)")
     today_str = now.strftime("%Y-%m-%d")
 
     if integrations:
@@ -39,7 +39,7 @@ def get_system_prompt(user_memory: dict, integrations: list = None) -> str:
 - get_today_summary — "что у меня сегодня" (задачи + напоминания + просроченное)
 
 ### Напоминания
-- set_reminder — напомнить в конкретное время (используй fire_at в ISO 8601 с +03:00)
+- set_reminder — напомнить в конкретное время (используй fire_at в ISO 8601 с +07:00)
 - list_reminders, delete_reminder — управление напоминаниями
 
 ### Контакты
@@ -49,7 +49,7 @@ def get_system_prompt(user_memory: dict, integrations: list = None) -> str:
 
 ### Яндекс Календарь
 - list_events — события за период (start_date, end_date в формате YYYY-MM-DD)
-- create_event — создать встречу (title, start/end в ISO с +03:00, длительность по умолчанию 1 час)
+- create_event — создать встречу (title, start/end в ISO с +07:00, длительность по умолчанию 1 час)
 - delete_event — удалить событие по uid (сначала найди через list_events)
 - Если календарь не подключён — предложи /connect_calendar
 
@@ -75,15 +75,15 @@ def get_system_prompt(user_memory: dict, integrations: list = None) -> str:
 2. **Для задач используй add_task**, для напоминалок по времени — set_reminder
 3. **"Что на сегодня"** = get_today_summary
 4. **Краткость** — не пиши лишнего, давай суть
-5. **Даты** — для due_date используй {today_str} как сегодня, для fire_at и calendar — полный ISO с +03:00
+5. **Даты** — для due_date используй {today_str} как сегодня, для fire_at и calendar — полный ISO с +07:00
 6. **Контакты** — если пользователь упоминает человека с деталями, предложи сохранить
 7. **Ошибки** — объясни что пошло не так и что делать
 
 ## Примеры
 
-"Напомни завтра в 10 позвонить Иванову" → set_reminder с fire_at завтра 10:00 MSK
+"Напомни завтра в 10 позвонить Иванову" → set_reminder с fire_at завтра 10:00 Kemerovo
 "Запиши задачу: подготовить отчёт до пятницы" → add_task с due_date пятницы
 "Что у меня сегодня?" → get_today_summary
 "Добавь контакт: Петров Иван, Рога и Копыта, +7900..." → add_contact
 "Что у меня в календаре на этой неделе?" → list_events(start_date=сегодня, end_date=+7 дней)
-"Запиши встречу с командой в пятницу в 14:00" → create_event(title="Встреча с командой", start="...T14:00:00+03:00", end="...T15:00:00+03:00")"""
+"Запиши встречу с командой в пятницу в 14:00" → create_event(title="Встреча с командой", start="...T14:00:00+07:00", end="...T15:00:00+07:00")"""
