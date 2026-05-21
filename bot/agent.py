@@ -14,6 +14,7 @@ from tools.contacts import (
 )
 from tools.broadcast import prepare_broadcast, confirm_broadcast, get_broadcast_history
 from tools.calendar import list_events, create_event, delete_event
+from tools.expenses import add_expense, list_expenses, get_expense_summary
 from system_prompt import get_system_prompt
 
 client = AsyncOpenAI(api_key=BOTHUB_API_KEY, base_url=BOTHUB_BASE_URL)
@@ -148,6 +149,24 @@ async def _execute_tool(tool_name: str, args: dict, user_id: str, bot=None) -> s
             return delete_event(user_id, args["event_uid"])
         except ValueError as e:
             return str(e)
+
+    # --- Expenses ---
+    if tool_name == "add_expense":
+        return add_expense(
+            user_id,
+            args["amount"],
+            category=args.get("category", "прочее"),
+            description=args.get("description"),
+            expense_date=args.get("expense_date"),
+        )
+
+    if tool_name == "list_expenses":
+        result = list_expenses(user_id, period=args.get("period", "week"), category=args.get("category"))
+        return json.dumps(result, ensure_ascii=False) if result else "[]"
+
+    if tool_name == "get_expense_summary":
+        result = get_expense_summary(user_id, period=args.get("period", "month"))
+        return json.dumps(result, ensure_ascii=False)
 
     # --- Browser ---
     if tool_name == "browser_navigate":

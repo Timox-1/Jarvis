@@ -443,4 +443,64 @@ TOOLS = [
             },
         },
     },
+
+    # --- Expenses ---
+    {
+        "type": "function",
+        "function": {
+            "name": "add_expense",
+            "description": "Record an expense. Use when user says 'потратил', 'заплатил', 'купил за', 'расход'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "amount": {"type": "number", "description": "Сумма в рублях"},
+                    "category": {
+                        "type": "string",
+                        "enum": ["еда", "транспорт", "жильё", "здоровье", "развлечения", "бизнес", "прочее"],
+                        "description": "Категория расхода"
+                    },
+                    "description": {"type": "string", "description": "На что потрачено"},
+                    "expense_date": {"type": "string", "description": "Дата YYYY-MM-DD, по умолчанию сегодня"},
+                },
+                "required": ["amount"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_expenses",
+            "description": "List expenses for a period. Use for 'сколько потратил', 'мои расходы', 'покажи траты'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "period": {
+                        "type": "string",
+                        "enum": ["today", "week", "month"],
+                        "description": "Период"
+                    },
+                    "category": {"type": "string", "description": "Фильтр по категории"},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_expense_summary",
+            "description": "Get expense totals by category. Use for 'итого', 'сводка расходов', 'на что трачу больше'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "period": {
+                        "type": "string",
+                        "enum": ["today", "week", "month"],
+                        "description": "Период"
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
 ]
