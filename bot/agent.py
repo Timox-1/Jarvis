@@ -116,7 +116,7 @@ async def _execute_tool(tool_name: str, args: dict, user_id: str, bot=None) -> s
     if tool_name == "confirm_broadcast":
         if not bot:
             return json.dumps({"status": "error", "error": "Bot not available for broadcast"})
-        result = await confirm_broadcast(bot, user_id, args["broadcast_id"])
+        result = await confirm_broadcast(bot, user_id, args.get("broadcast_id"))
         return json.dumps(result, ensure_ascii=False)
 
     if tool_name == "get_broadcast_history":
