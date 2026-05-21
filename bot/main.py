@@ -51,7 +51,7 @@ async def _send_morning_briefings(bot):
                 if events:
                     lines.append(f"\n📅 *Встречи сегодня:*")
                     for e in events[:5]:
-                        lines.append(f"  • {e.get('summary', 'Встреча')} в {e.get('start', '')[:16]}")
+                        lines.append(f"  • {e.get('title', 'Без названия')} в {e.get('start', '')[:16]}")
             except Exception:
                 pass  # No calendar integration — skip silently
 
