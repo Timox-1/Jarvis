@@ -394,4 +394,52 @@ TOOLS = [
             },
         },
     },
+
+    # --- Яндекс Календарь ---
+    {
+        "type": "function",
+        "function": {
+            "name": "list_events",
+            "description": "Показать события в Яндекс Календаре за период. Используй когда пользователь спрашивает 'что у меня в календаре', 'какие встречи на неделе' и т.п. Если календарь не подключён — предложи /connect_calendar.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "start_date": {"type": "string", "description": "Начало периода в формате YYYY-MM-DD"},
+                    "end_date": {"type": "string", "description": "Конец периода в формате YYYY-MM-DD"},
+                },
+                "required": ["start_date", "end_date"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_event",
+            "description": "Создать событие в Яндекс Календаре. Используй когда пользователь говорит 'запиши встречу', 'добавь в календарь'. Если календарь не подключён — предложи /connect_calendar.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string", "description": "Название события"},
+                    "start": {"type": "string", "description": "Начало в ISO формате с timezone, напр. 2026-05-22T15:00:00+03:00"},
+                    "end": {"type": "string", "description": "Конец в ISO формате с timezone, напр. 2026-05-22T16:00:00+03:00"},
+                    "description": {"type": "string", "description": "Описание события (опционально)"},
+                },
+                "required": ["title", "start", "end"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_event",
+            "description": "Удалить событие из Яндекс Календаря по UID.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "event_uid": {"type": "string", "description": "UID события из list_events"},
+                },
+                "required": ["event_uid"],
+            },
+        },
+    },
 ]
