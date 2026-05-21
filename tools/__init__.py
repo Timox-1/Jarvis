@@ -444,6 +444,37 @@ TOOLS = [
         },
     },
 
+    # --- Contact Notes ---
+    {
+        "type": "function",
+        "function": {
+            "name": "add_contact_note",
+            "description": "Save a note about a contact after a call or meeting. Use when user says 'запиши по [имя]', 'после звонка с [имя]', 'отметь по контакту'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "contact_id": {"type": "string", "description": "Contact UUID — find via list_contacts first"},
+                    "text": {"type": "string", "description": "Текст заметки"},
+                },
+                "required": ["contact_id", "text"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_contact_notes",
+            "description": "Show notes history for a contact. Use when user asks 'что по [имя]', 'история с [имя]', 'заметки по контакту'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "contact_id": {"type": "string", "description": "Contact UUID"},
+                },
+                "required": ["contact_id"],
+            },
+        },
+    },
+
     # --- Expenses ---
     {
         "type": "function",

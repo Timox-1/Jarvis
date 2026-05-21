@@ -15,6 +15,7 @@ from tools.contacts import (
 from tools.broadcast import prepare_broadcast, confirm_broadcast, get_broadcast_history
 from tools.calendar import list_events, create_event, delete_event
 from tools.expenses import add_expense, list_expenses, get_expense_summary
+from tools.contact_notes import add_contact_note, list_contact_notes
 from system_prompt import get_system_prompt
 
 client = AsyncOpenAI(api_key=BOTHUB_API_KEY, base_url=BOTHUB_BASE_URL)
@@ -149,6 +150,14 @@ async def _execute_tool(tool_name: str, args: dict, user_id: str, bot=None) -> s
             return delete_event(user_id, args["event_uid"])
         except ValueError as e:
             return str(e)
+
+    # --- Contact Notes ---
+    if tool_name == "add_contact_note":
+        return add_contact_note(user_id, args["contact_id"], args["text"])
+
+    if tool_name == "list_contact_notes":
+        result = list_contact_notes(user_id, args["contact_id"])
+        return json.dumps(result, ensure_ascii=False) if result else "[]"
 
     # --- Expenses ---
     if tool_name == "add_expense":
