@@ -24,7 +24,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     history = get_history(user_id)
     save_message(user_id, "user", text)
 
-    response = await run_agent(user_id, text, history, bot=context.bot)
+    try:
+        response = await run_agent(user_id, text, history, bot=context.bot)
+    except Exception as e:
+        response = f"Произошла ошибка при обработке запроса. Попробуй ещё раз."
 
     save_message(user_id, "assistant", response)
     await update.message.reply_text(response)

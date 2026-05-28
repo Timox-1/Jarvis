@@ -94,6 +94,10 @@ def list_tasks(
 
 def complete_task(user_id: str, task_id: str) -> str:
     """Mark a task as completed."""
+    import re
+    if not re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', task_id, re.IGNORECASE):
+        return "Ошибка: task_id должен быть UUID. Сначала вызови list_tasks чтобы получить ID задачи."
+
     db = get_db()
 
     # Verify ownership
@@ -112,6 +116,10 @@ def complete_task(user_id: str, task_id: str) -> str:
 
 def delete_task(user_id: str, task_id: str) -> str:
     """Delete a task."""
+    import re
+    if not re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', task_id, re.IGNORECASE):
+        return "Ошибка: task_id должен быть UUID. Сначала вызови list_tasks чтобы получить ID задачи."
+
     db = get_db()
 
     task = db.table("tasks").select("title").eq("id", task_id).eq("user_id", user_id).execute()
