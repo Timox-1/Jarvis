@@ -271,7 +271,8 @@ async def handle_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     lines.append(f"📋 Задач на сегодня: *{today_count}*")
     lines.append(f"📅 Задач на завтра: *{tomorrow_count}*")
     lines.append(f"⏰ Активных напоминаний: *{len(reminders)}*")
-    lines.append(f"📆 Яндекс Календарь: {'подключён ✅' if cal_connected else 'не подключён — /connect\\_calendar'}")
+    cal_status = "подключён ✅" if cal_connected else "не подключён — /connect\\_calendar"
+    lines.append(f"📆 Яндекс Календарь: {cal_status}")
 
     await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
