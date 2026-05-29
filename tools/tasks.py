@@ -6,6 +6,9 @@ from datetime import datetime, date, timedelta, timezone
 from db.client import get_db
 
 MOSCOW_TZ = timezone(timedelta(hours=3))
+KEMEROVO_TZ = timezone(timedelta(hours=7))
+
+PRIORITY_ORDER = {"urgent": 4, "high": 3, "normal": 2, "low": 1}
 
 
 def add_task(
@@ -72,7 +75,7 @@ def list_tasks(
         query = query.in_("status", ["pending", "in_progress"])
 
     if date_filter:
-        today = datetime.now(MOSCOW_TZ).date()
+        today = datetime.now(KEMEROVO_TZ).date()
 
         if date_filter == "today":
             query = query.eq("due_date", today.isoformat())
@@ -86,10 +89,16 @@ def list_tasks(
             # Specific date
             query = query.eq("due_date", date_filter)
 
-    query = query.order("due_date", nullsfirst=False).order("priority", desc=True)
+    query = query.order("due_date", nullsfirst=False)
 
     result = query.execute()
-    return result.data
+    return sorted(
+        result.data,
+        key=lambda t: (
+            t.get("due_date") or "9999-99-99",
+            -PRIORITY_ORDER.get(t.get("priority", "normal"), 2),
+        ),
+    )
 
 
 def complete_task(user_id: str, task_id: str) -> str:
@@ -177,17 +186,19 @@ def update_task(
 def get_today_summary(user_id: str) -> dict:
     """Get summary of today's tasks and upcoming items."""
     db = get_db()
-    today = datetime.now(MOSCOW_TZ).date()
+    today = datetime.now(KEMEROVO_TZ).date()
     tomorrow = today + timedelta(days=1)
 
     # Today's tasks
-    today_tasks = (db.table("tasks")
-                   .select("*")
-                   .eq("user_id", user_id)
-                   .eq("due_date", today.isoformat())
-                   .in_("status", ["pending", "in_progress"])
-                   .order("priority", desc=True)
-                   .execute()).data
+    today_tasks = sorted(
+        (db.table("tasks")
+         .select("*")
+         .eq("user_id", user_id)
+         .eq("due_date", today.isoformat())
+         .in_("status", ["pending", "in_progress"])
+         .execute()).data,
+        key=lambda t: -PRIORITY_ORDER.get(t.get("priority", "normal"), 2),
+    )
 
     # Overdue tasks
     overdue = (db.table("tasks")

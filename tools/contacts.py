@@ -71,9 +71,7 @@ def list_contacts(
     query = db.table("contacts").select("*").eq("user_id", user_id)
 
     if search:
-        # Simple search - Supabase doesn't support OR in Python client easily
-        # Search by name using ilike
-        query = query.ilike("name", f"%{search}%")
+        query = query.or_(f"name.ilike.%{search}%,company.ilike.%{search}%")
 
     if tag:
         query = query.contains("tags", [tag])

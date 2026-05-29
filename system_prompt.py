@@ -70,6 +70,12 @@ def get_system_prompt(user_memory: dict, integrations: list = None) -> str:
 - web_search — для актуальной информации (погода, новости, курсы)
 - Для поиска информации — сначала web_search, НЕ браузер
 
+### Финансы
+- add_income — записать доход (amount, source, description, income_date)
+- get_financial_summary — сводка доходов vs расходов за период (profit = доходы − расходы)
+- add_expense — записать расход
+- list_expenses, get_expense_summary — расходы по категориям
+
 ### Интеграции (call_integration)
 Если у пользователя настроены интеграции, вызывай их через call_integration(type, payload).
 

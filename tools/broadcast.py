@@ -34,11 +34,14 @@ def prepare_broadcast(
             "error": "Нет контактов для рассылки. Добавьте контакты с telegram_id или telegram_username."
         }
 
-    # Create pending broadcast record
+    contact_ids = [c["id"] for c in contacts]
+
+    # Create pending broadcast record — store recipient IDs so confirm uses same set
     broadcast = db.table("broadcasts").insert({
         "user_id": user_id,
         "message": message,
         "recipient_count": len(contacts),
+        "recipient_ids": contact_ids,
         "status": "pending_confirmation"
     }).execute()
 
@@ -106,8 +109,12 @@ async def confirm_broadcast(
     broadcast_id = broadcast_data["id"]  # always use the real ID from DB
     message = broadcast_data["message"]
 
-    # Get contacts again
-    contacts = get_contacts_for_broadcast(user_id)
+    # Use the stored recipient IDs from prepare step
+    recipient_ids = broadcast_data.get("recipient_ids") or []
+    if recipient_ids:
+        contacts = get_contacts_for_broadcast(user_id, contact_ids=recipient_ids)
+    else:
+        contacts = get_contacts_for_broadcast(user_id)
 
     # Update status to sending
     db.table("broadcasts").update({

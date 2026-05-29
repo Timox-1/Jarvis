@@ -10,6 +10,14 @@ DOWNLOADS_DIR = Path("downloads")
 DOWNLOADS_DIR.mkdir(exist_ok=True)
 
 
+async def _safe_reply(message, text: str) -> None:
+    """Reply with Markdown, fallback to plain text if parsing fails."""
+    try:
+        await message.reply_text(text, parse_mode="Markdown")
+    except Exception:
+        await message.reply_text(text)
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     if not is_user_allowed(user.id):
@@ -24,13 +32,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     history = get_history(user_id)
     save_message(user_id, "user", text)
 
+    error_response = None
     try:
         response = await run_agent(user_id, text, history, bot=context.bot)
     except Exception as e:
-        response = f"Произошла ошибка при обработке запроса. Попробуй ещё раз."
+        print(f"[agent error] user={user_id}: {e}")
+        error_response = "Произошла ошибка при обработке запроса. Попробуй ещё раз."
+        response = error_response
 
-    save_message(user_id, "assistant", response)
-    await update.message.reply_text(response)
+    if not error_response:
+        save_message(user_id, "assistant", response)
+
+    await _safe_reply(update.message, response)
 
 
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -61,11 +74,21 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     history = get_history(user_id)
     save_message(user_id, "user", user_message)
 
-    response = await run_agent(user_id, user_message, history, bot=context.bot)
-    save_message(user_id, "assistant", response)
-    await update.message.reply_text(response)
+    error_response = None
+    try:
+        response = await run_agent(user_id, user_message, history, bot=context.bot)
+    except Exception as e:
+        print(f"[document agent error] user={user_id}: {e}")
+        error_response = "Произошла ошибка при обработке файла. Попробуй ещё раз."
+        response = error_response
+    finally:
+        if file_path.exists():
+            os.remove(file_path)
 
-    os.remove(file_path)
+    if not error_response:
+        save_message(user_id, "assistant", response)
+
+    await _safe_reply(update.message, response)
 
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -120,7 +143,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     history = get_history(user_id)
     save_message(user_id, "user", f"{caption} [фото]")
     save_message(user_id, "assistant", response)
-    await update.message.reply_text(response)
+    await _safe_reply(update.message, response)
     os.remove(file_path)
 
 
@@ -161,7 +184,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         save_message(user_id, "user", text)
         response = await run_agent(user_id, text, history, bot=context.bot)
         save_message(user_id, "assistant", response)
-        await update.message.reply_text(response)
+        await _safe_reply(update.message, response)
 
     finally:
         if file_path.exists():
@@ -174,10 +197,16 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "📋 Задачи и планирование:\n"
         "• «Запиши задачу: ...»\n"
         "• «Что у меня сегодня?»\n"
-        "• «Напомни завтра в 10...»\n\n"
+        "• «Напомни завтра в 10...»\n"
+        "• «Перенеси задачу на пятницу»\n\n"
         "👥 Контакты и рассылки:\n"
         "• «Добавь контакт: Иван, +7...»\n"
+        "• «Добавь Ивана в группу Клиенты»\n"
         "• «Разошли клиентам: ...»\n\n"
+        "💰 Финансы:\n"
+        "• «Клиент оплатил 50000₽»\n"
+        "• «Потратил 3000 на такси»\n"
+        "• «Покажи финансовую сводку за месяц»\n\n"
         "📅 Яндекс Календарь:\n"
         "• «Что у меня в календаре на неделе?»\n"
         "• «Запиши встречу на завтра в 15:00»\n\n"
@@ -185,6 +214,7 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "• «Запиши меня к врачу»\n"
         "• «Заполни форму на сайте»\n\n"
         "📄 Файлы и фото — просто отправь\n\n"
+        "/status — быстрый дашборд\n"
         "/connect_calendar — подключить Яндекс Календарь\n"
         "/clear — очистить историю\n\n"
         "Просто напиши что нужно!"
@@ -204,6 +234,46 @@ async def handle_clear(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await browser_close()
 
     await update.message.reply_text(f"История очищена ({count} сообщений удалено). Браузер сброшен. Начинаем с чистого листа!")
+
+
+async def handle_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    if not is_user_allowed(user.id):
+        await update.message.reply_text("Доступ закрыт.")
+        return
+
+    user_id = get_or_create_user(user.id, user.full_name)
+
+    from tools.tasks import get_today_summary
+    from tools.reminders import list_reminders
+    from db.client import get_db
+
+    summary = get_today_summary(user_id)
+    reminders = list_reminders(user_id)
+
+    db = get_db()
+    cal_connected = bool(
+        db.table("user_integrations")
+        .select("id")
+        .eq("user_id", user_id)
+        .eq("provider", "yandex_calendar")
+        .execute().data
+    )
+
+    lines = ["*Статус Джарвиса*\n"]
+
+    overdue = summary["summary"]["overdue_count"]
+    today_count = summary["summary"]["today_count"]
+    tomorrow_count = summary["summary"]["tomorrow_count"]
+
+    if overdue:
+        lines.append(f"🔴 Просрочено задач: *{overdue}*")
+    lines.append(f"📋 Задач на сегодня: *{today_count}*")
+    lines.append(f"📅 Задач на завтра: *{tomorrow_count}*")
+    lines.append(f"⏰ Активных напоминаний: *{len(reminders)}*")
+    lines.append(f"📆 Яндекс Календарь: {'подключён ✅' if cal_connected else 'не подключён — /connect\\_calendar'}")
+
+    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
 
 async def handle_connect_calendar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

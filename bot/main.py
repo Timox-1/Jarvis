@@ -2,7 +2,7 @@ import asyncio
 from datetime import datetime, timezone, timedelta, date
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
 from config import TELEGRAM_TOKEN
-from bot.handlers import handle_message, handle_document, handle_photo, handle_voice, handle_start, handle_clear, handle_connect_calendar
+from bot.handlers import handle_message, handle_document, handle_photo, handle_voice, handle_start, handle_clear, handle_connect_calendar, handle_status
 from tools.reminders import check_and_fire_reminders
 
 
@@ -96,6 +96,7 @@ def main() -> None:
 
     app.add_handler(CommandHandler("start", handle_start))
     app.add_handler(CommandHandler("clear", handle_clear))
+    app.add_handler(CommandHandler("status", handle_status))
     app.add_handler(CommandHandler("connect_calendar", handle_connect_calendar))
     app.add_handler(MessageHandler(filters.VOICE, handle_voice))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))

@@ -1,5 +1,7 @@
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime, timezone
 from db.client import get_db
+
+KEMEROVO_TZ = timezone(timedelta(hours=7))
 
 
 def add_expense(user_id: str, amount: float, category: str = "прочее",
@@ -10,7 +12,7 @@ def add_expense(user_id: str, amount: float, category: str = "прочее",
         "amount": amount,
         "currency": "RUB",
         "category": category,
-        "date": expense_date or date.today().isoformat(),
+        "date": expense_date or datetime.now(KEMEROVO_TZ).date().isoformat(),
     }
     if description:
         data["description"] = description

@@ -7,7 +7,7 @@ from tools.browser import browser_navigate, browser_click, browser_type, browser
 from tools.n8n import call_integration, list_integrations_for_user
 from tools.reminders import set_reminder, list_reminders, delete_reminder
 from tools.search import web_search
-from tools.tasks import add_task, list_tasks, complete_task, delete_task, get_today_summary
+from tools.tasks import add_task, list_tasks, complete_task, delete_task, get_today_summary, update_task
 from tools.contacts import (
     add_contact, list_contacts, get_contact, update_contact, delete_contact,
     create_contact_group, list_contact_groups, add_contact_to_group, get_group_contacts
@@ -15,6 +15,7 @@ from tools.contacts import (
 from tools.broadcast import prepare_broadcast, confirm_broadcast, get_broadcast_history
 from tools.calendar import list_events, create_event, delete_event
 from tools.expenses import add_expense, list_expenses, get_expense_summary
+from tools.income import add_income, list_income, get_financial_summary
 from tools.contact_notes import add_contact_note, list_contact_notes
 from tools.email import list_emails, read_email, send_email
 from system_prompt import get_system_prompt
@@ -69,6 +70,18 @@ async def _execute_tool(tool_name: str, args: dict, user_id: str, bot=None) -> s
     if tool_name == "delete_task":
         return delete_task(user_id, args["task_id"])
 
+    if tool_name == "update_task":
+        return update_task(
+            user_id,
+            args["task_id"],
+            title=args.get("title"),
+            description=args.get("description"),
+            due_date=args.get("due_date"),
+            due_time=args.get("due_time"),
+            priority=args.get("priority"),
+            status=args.get("status"),
+        )
+
     if tool_name == "get_today_summary":
         result = get_today_summary(user_id)
         return json.dumps(result, ensure_ascii=False)
@@ -105,6 +118,9 @@ async def _execute_tool(tool_name: str, args: dict, user_id: str, bot=None) -> s
     if tool_name == "list_contact_groups":
         result = list_contact_groups(user_id)
         return json.dumps(result, ensure_ascii=False) if result else "[]"
+
+    if tool_name == "add_contact_to_group":
+        return add_contact_to_group(user_id, args["contact_id"], args["group_id"])
 
     # --- Broadcasts ---
     if tool_name == "prepare_broadcast":
@@ -180,6 +196,20 @@ async def _execute_tool(tool_name: str, args: dict, user_id: str, bot=None) -> s
     if tool_name == "list_contact_notes":
         result = list_contact_notes(user_id, args["contact_id"])
         return json.dumps(result, ensure_ascii=False) if result else "[]"
+
+    # --- Income ---
+    if tool_name == "add_income":
+        return add_income(
+            user_id,
+            args["amount"],
+            source=args.get("source", "прочее"),
+            description=args.get("description"),
+            income_date=args.get("income_date"),
+        )
+
+    if tool_name == "get_financial_summary":
+        result = get_financial_summary(user_id, period=args.get("period", "month"))
+        return json.dumps(result, ensure_ascii=False)
 
     # --- Expenses ---
     if tool_name == "add_expense":

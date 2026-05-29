@@ -130,6 +130,34 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "update_task",
+            "description": "Update an existing task (change title, deadline, priority, status). Use when user says 'перенеси задачу', 'измени срок', 'повысь приоритет'. First call list_tasks to get task_id.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task_id": {"type": "string", "description": "Task UUID to update"},
+                    "title": {"type": "string", "description": "New title (optional)"},
+                    "due_date": {"type": "string", "description": "New due date YYYY-MM-DD (optional)"},
+                    "due_time": {"type": "string", "description": "New due time HH:MM (optional)"},
+                    "priority": {
+                        "type": "string",
+                        "enum": ["low", "normal", "high", "urgent"],
+                        "description": "New priority (optional)"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": ["pending", "in_progress", "done"],
+                        "description": "New status (optional)"
+                    },
+                    "description": {"type": "string", "description": "New description (optional)"},
+                },
+                "required": ["task_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "get_today_summary",
             "description": "Get a summary of today: tasks, overdue items, reminders. Use for 'what's on my plate', 'brief me', 'morning summary'.",
             "parameters": {
@@ -206,6 +234,21 @@ TOOLS = [
                 "type": "object",
                 "properties": {},
                 "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_contact_to_group",
+            "description": "Add a contact to a group. Use when user says 'добавь [имя] в группу [название]'. First find contact via list_contacts, find group via list_contact_groups.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "contact_id": {"type": "string", "description": "Contact UUID from list_contacts"},
+                    "group_id": {"type": "string", "description": "Group UUID from list_contact_groups"},
+                },
+                "required": ["contact_id", "group_id"],
             },
         },
     },
@@ -519,6 +562,46 @@ TOOLS = [
                     "contact_id": {"type": "string", "description": "Contact UUID"},
                 },
                 "required": ["contact_id"],
+            },
+        },
+    },
+
+    # --- Income ---
+    {
+        "type": "function",
+        "function": {
+            "name": "add_income",
+            "description": "Record an income entry. Use when user says 'получил оплату', 'пришли деньги', 'доход', 'заработал', 'клиент оплатил'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "amount": {"type": "number", "description": "Сумма в рублях"},
+                    "source": {
+                        "type": "string",
+                        "description": "Источник дохода, напр. 'клиент', 'фриланс', 'бизнес', 'инвестиции', 'прочее'"
+                    },
+                    "description": {"type": "string", "description": "Описание: от кого, за что"},
+                    "income_date": {"type": "string", "description": "Дата YYYY-MM-DD, по умолчанию сегодня"},
+                },
+                "required": ["amount"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_financial_summary",
+            "description": "Get income vs expenses summary (P&L). Use for 'сколько заработал', 'финансовая сводка', 'баланс за месяц', 'прибыль'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "period": {
+                        "type": "string",
+                        "enum": ["today", "week", "month"],
+                        "description": "Период"
+                    },
+                },
+                "required": [],
             },
         },
     },
