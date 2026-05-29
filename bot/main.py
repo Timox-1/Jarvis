@@ -86,6 +86,12 @@ async def _morning_briefing_loop(bot):
 async def _post_init(app):
     asyncio.create_task(_reminder_loop(app.bot))
     asyncio.create_task(_morning_briefing_loop(app.bot))
+    await app.bot.set_my_commands([
+        ("start", "Список возможностей"),
+        ("status", "Быстрый дашборд — задачи, напоминания"),
+        ("connect_calendar", "Подключить Яндекс Календарь"),
+        ("clear", "Очистить историю диалога"),
+    ])
 
 
 def main() -> None:
