@@ -5,6 +5,8 @@ from config import TELEGRAM_TOKEN
 from bot.handlers import handle_message, handle_document, handle_photo, handle_voice, handle_start, handle_clear, handle_connect_calendar, handle_status
 from tools.reminders import check_and_fire_reminders
 
+KEMEROVO_TZ = timezone(timedelta(hours=7))
+
 
 async def _reminder_loop(bot):
     while True:
@@ -15,8 +17,25 @@ async def _reminder_loop(bot):
             print(f"Reminder check error: {e}")
 
 
+BRIEFING_HEADER = "☀️ *Доброе утро! Вот твой день:*"
+
+
+def _briefing_already_sent(db, user_id: str, since_utc: str) -> bool:
+    """Guard against a second briefing after a restart or an early timer wake-up."""
+    sent = (db.table("messages")
+            .select("id")
+            .eq("user_id", user_id)
+            .eq("role", "assistant")
+            .gte("created_at", since_utc)
+            .ilike("content", f"{BRIEFING_HEADER}%")
+            .limit(1)
+            .execute()).data
+    return bool(sent)
+
+
 async def _send_morning_briefings(bot):
     from db.client import get_db
+    from tools.memory import save_message
     from tools.tasks import get_today_summary
     from tools.calendar import list_events
 
@@ -26,10 +45,18 @@ async def _send_morning_briefings(bot):
     today = date.today().isoformat()
     tomorrow = (date.today() + timedelta(days=1)).isoformat()
 
+    # Start of the current Kemerovo day, expressed in UTC — messages.created_at is UTC
+    kemerovo_now = datetime.now(KEMEROVO_TZ)
+    day_start_utc = (kemerovo_now.replace(hour=0, minute=0, second=0, microsecond=0)
+                     .astimezone(timezone.utc).isoformat())
+
     for user in users:
         try:
+            if _briefing_already_sent(db, user["id"], day_start_utc):
+                continue
+
             summary = get_today_summary(user["id"])
-            lines = ["☀️ *Доброе утро! Вот твой день:*\n"]
+            lines = [f"{BRIEFING_HEADER}\n"]
 
             if summary["overdue"]:
                 lines.append(f"🔴 *Просроченных задач: {summary['summary']['overdue_count']}*")
@@ -61,13 +88,14 @@ async def _send_morning_briefings(bot):
                 text=text,
                 parse_mode="Markdown"
             )
+            # Into history, so "уже сделано" in reply has the task names to resolve against
+            save_message(user["id"], "assistant", text)
         except Exception as e:
             print(f"Morning briefing error for user {user['id']}: {e}")
 
 
 async def _morning_briefing_loop(bot):
     """Sends morning briefing at 09:00 Kemerovo time (02:00 UTC) every day."""
-    KEMEROVO_TZ = timezone(timedelta(hours=7))
     TARGET_HOUR = 9
 
     while True:
@@ -75,7 +103,10 @@ async def _morning_briefing_loop(bot):
         next_run = now.replace(hour=TARGET_HOUR, minute=0, second=0, microsecond=0)
         if now >= next_run:
             next_run += timedelta(days=1)
-        await asyncio.sleep((next_run - now).total_seconds())
+
+        # asyncio.sleep may wake slightly early; re-sleep instead of firing before target
+        while datetime.now(KEMEROVO_TZ) < next_run:
+            await asyncio.sleep((next_run - datetime.now(KEMEROVO_TZ)).total_seconds())
 
         try:
             await _send_morning_briefings(bot)

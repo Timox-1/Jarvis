@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from db.client import get_db
+from tools.resolve import resolve_row
 
 
 def set_reminder(user_id: str, text: str, fire_at: str) -> str:
@@ -25,9 +26,22 @@ def list_reminders(user_id: str) -> list[dict]:
 
 
 def delete_reminder(user_id: str, reminder_id: str) -> str:
+    """Delete a reminder. Accepts a UUID or a fragment of the reminder text."""
+    reminder, error = resolve_row(
+        "reminders",
+        user_id,
+        reminder_id,
+        label_field="text",
+        entity_name="Напоминание",
+        status_field="done",
+        open_statuses=[False],
+    )
+    if error:
+        return error
+
     db = get_db()
-    db.table("reminders").delete().eq("id", reminder_id).eq("user_id", user_id).execute()
-    return "Напоминание удалено"
+    db.table("reminders").delete().eq("id", reminder["id"]).execute()
+    return f"Напоминание удалено: {reminder['text']}"
 
 
 async def check_and_fire_reminders(bot) -> None:

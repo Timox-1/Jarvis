@@ -103,11 +103,11 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "complete_task",
-            "description": "Mark a task as completed.",
+            "description": "Mark a task as completed. ALWAYS call this when the user says a task is done ('сделано', 'выполнил', 'уже закрыл', 'просроченные выполнены') — never just agree in words.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "task_id": {"type": "string", "description": "Task UUID to complete"},
+                    "task_id": {"type": "string", "description": "Task UUID, or a fragment of the task title (e.g. 'отчёт Максиму') — the title is matched against the user's open tasks."},
                 },
                 "required": ["task_id"],
             },
@@ -121,7 +121,7 @@ TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "task_id": {"type": "string", "description": "Task UUID to delete"},
+                    "task_id": {"type": "string", "description": "Task UUID, or a fragment of the task title — the title is matched against the user's open tasks."},
                 },
                 "required": ["task_id"],
             },
@@ -284,11 +284,11 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "delete_reminder",
-            "description": "Cancel and delete a reminder by its ID",
+            "description": "Cancel and delete a reminder. ALWAYS call this when the user cancels a reminder — never just confirm in words.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "reminder_id": {"type": "string", "description": "UUID of the reminder to delete"},
+                    "reminder_id": {"type": "string", "description": "Reminder UUID, or a fragment of its text (e.g. 'позвонить Иванову') — matched against active reminders."},
                 },
                 "required": ["reminder_id"],
             },
@@ -544,7 +544,7 @@ TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "contact_id": {"type": "string", "description": "Contact UUID — find via list_contacts first"},
+                    "contact_id": {"type": "string", "description": "Contact UUID, or the contact's name (e.g. 'Максим') — matched against the address book."},
                     "text": {"type": "string", "description": "Текст заметки"},
                 },
                 "required": ["contact_id", "text"],
@@ -559,7 +559,7 @@ TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "contact_id": {"type": "string", "description": "Contact UUID"},
+                    "contact_id": {"type": "string", "description": "Contact UUID, or the contact's name (e.g. 'Максим')."},
                 },
                 "required": ["contact_id"],
             },

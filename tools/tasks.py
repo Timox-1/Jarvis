@@ -4,6 +4,7 @@ Tasks/TODO management for the assistant.
 
 from datetime import datetime, date, timedelta, timezone
 from db.client import get_db
+from tools.resolve import resolve_row
 
 MOSCOW_TZ = timezone(timedelta(hours=3))
 KEMEROVO_TZ = timezone(timedelta(hours=7))
@@ -101,44 +102,44 @@ def list_tasks(
     )
 
 
+def _resolve_task(user_id: str, task_ref: str) -> tuple[dict | None, str | None]:
+    """Resolve a task by UUID or by title fragment (open tasks only)."""
+    return resolve_row(
+        "tasks",
+        user_id,
+        task_ref,
+        label_field="title",
+        entity_name="Задача",
+        status_field="status",
+        open_statuses=["pending", "in_progress"],
+    )
+
+
 def complete_task(user_id: str, task_id: str) -> str:
-    """Mark a task as completed."""
-    import re
-    if not re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', task_id, re.IGNORECASE):
-        return "Ошибка: task_id должен быть UUID. Сначала вызови list_tasks чтобы получить ID задачи."
+    """Mark a task as completed. Accepts a task UUID or a fragment of its title."""
+    task, error = _resolve_task(user_id, task_id)
+    if error:
+        return error
 
     db = get_db()
-
-    # Verify ownership
-    task = db.table("tasks").select("title").eq("id", task_id).eq("user_id", user_id).execute()
-
-    if not task.data:
-        return "Задача не найдена"
-
     db.table("tasks").update({
         "status": "done",
         "completed_at": datetime.now(timezone.utc).isoformat()
-    }).eq("id", task_id).execute()
+    }).eq("id", task["id"]).execute()
 
-    return f"Задача выполнена: {task.data[0]['title']}"
+    return f"Задача выполнена: {task['title']}"
 
 
 def delete_task(user_id: str, task_id: str) -> str:
-    """Delete a task."""
-    import re
-    if not re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', task_id, re.IGNORECASE):
-        return "Ошибка: task_id должен быть UUID. Сначала вызови list_tasks чтобы получить ID задачи."
+    """Delete a task. Accepts a task UUID or a fragment of its title."""
+    task, error = _resolve_task(user_id, task_id)
+    if error:
+        return error
 
     db = get_db()
+    db.table("tasks").delete().eq("id", task["id"]).execute()
 
-    task = db.table("tasks").select("title").eq("id", task_id).eq("user_id", user_id).execute()
-
-    if not task.data:
-        return "Задача не найдена"
-
-    db.table("tasks").delete().eq("id", task_id).execute()
-
-    return f"Задача удалена: {task.data[0]['title']}"
+    return f"Задача удалена: {task['title']}"
 
 
 def update_task(
@@ -151,14 +152,12 @@ def update_task(
     priority: str = None,
     status: str = None
 ) -> str:
-    """Update a task."""
+    """Update a task. Accepts a task UUID or a fragment of its title."""
+    task, error = _resolve_task(user_id, task_id)
+    if error:
+        return error
+
     db = get_db()
-
-    task = db.table("tasks").select("title").eq("id", task_id).eq("user_id", user_id).execute()
-
-    if not task.data:
-        return "Задача не найдена"
-
     updates = {}
     if title:
         updates["title"] = title
@@ -178,9 +177,9 @@ def update_task(
     if not updates:
         return "Нечего обновлять"
 
-    db.table("tasks").update(updates).eq("id", task_id).execute()
+    db.table("tasks").update(updates).eq("id", task["id"]).execute()
 
-    return f"Задача обновлена: {title or task.data[0]['title']}"
+    return f"Задача обновлена: {title or task['title']}"
 
 
 def get_today_summary(user_id: str) -> dict:

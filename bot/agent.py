@@ -195,6 +195,8 @@ async def _execute_tool(tool_name: str, args: dict, user_id: str, bot=None) -> s
 
     if tool_name == "list_contact_notes":
         result = list_contact_notes(user_id, args["contact_id"])
+        if isinstance(result, str):  # resolution failed — pass the hint back to GPT
+            return result
         return json.dumps(result, ensure_ascii=False) if result else "[]"
 
     # --- Income ---
