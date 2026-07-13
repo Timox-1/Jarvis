@@ -476,11 +476,11 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "delete_event",
-            "description": "Удалить событие из Яндекс Календаря по UID.",
+            "description": "Удалить событие из Яндекс Календаря. Вызывай всегда, когда пользователь отменяет встречу — не подтверждай отмену на словах.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "event_uid": {"type": "string", "description": "UID события из list_events"},
+                    "event_uid": {"type": "string", "description": "UID события из list_events, либо название встречи (например 'встреча с Максимом') — ищется среди событий за -7..+90 дней."},
                 },
                 "required": ["event_uid"],
             },

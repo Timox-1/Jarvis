@@ -17,7 +17,17 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
+            set -e
             cd /opt/jarvis
             git pull origin main
-            docker-compose up -d --build
+            docker compose up -d --build
             docker image prune -f
+
+            # The container must be running the code we just pulled, not a stale image
+            sleep 5
+            if [ -z "$(docker compose ps --status running --quiet bot)" ]; then
+              echo "DEPLOY FAILED: bot container is not running"
+              docker compose logs --tail 40 bot
+              exit 1
+            fi
+            echo "Deployed $(git rev-parse --short HEAD) — bot is running"

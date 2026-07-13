@@ -144,20 +144,50 @@ def create_event(
     return f"Событие создано: {title} (uid: {event_uid})"
 
 
-def delete_event(user_id: str, event_uid: str) -> str:
-    """Delete event by UID."""
-    access_token, _ = _get_valid_token(user_id)
-    client = _get_caldav_client(access_token)
-
+def _delete_by_uid(client, event_uid: str) -> bool:
     principal = client.principal()
     for calendar in principal.calendars():
         try:
             results = calendar.search(uid=event_uid)
             if results:
                 results[0].delete()
-                return "Событие удалено"
+                return True
         except Exception:
             continue
+    return False
+
+
+def delete_event(user_id: str, event_uid: str) -> str:
+    """
+    Delete an event by UID, or by a fragment of its title.
+
+    A title falls back to a search over -7..+90 days, so GPT can delete an event
+    the user named ("встречу с Максимом") without knowing its CalDAV UID.
+    """
+    access_token, _ = _get_valid_token(user_id)
+    client = _get_caldav_client(access_token)
+
+    if _delete_by_uid(client, event_uid):
+        return "Событие удалено"
+
+    today = datetime.now(timezone.utc).date()
+    window = list_events(
+        user_id,
+        (today - timedelta(days=7)).isoformat(),
+        (today + timedelta(days=90)).isoformat(),
+    )
+    matches = [e for e in window if event_uid.lower() in e.get("title", "").lower()]
+
+    if not matches:
+        return f"Событие «{event_uid}» не найдено. Вызови list_events и уточни у пользователя, какое удалять."
+
+    if len(matches) > 1:
+        options = "\n".join(f"  • {e['title']} — {e['start'][:16]} (uid: {e['uid']})" for e in matches)
+        return f"Под «{event_uid}» подходит несколько событий — уточни у пользователя:\n{options}"
+
+    event = matches[0]
+    if _delete_by_uid(client, event["uid"]):
+        return f"Событие удалено: {event['title']} ({event['start'][:16]})"
 
     return "Событие не найдено"
 
