@@ -2,6 +2,17 @@ from db.client import get_db
 
 HISTORY_LIMIT = 20
 
+# Credentials live in user_memory because IMAP/SMTP need the password itself,
+# but they must never reach the model: read_memory feeds the system prompt, so
+# anything matching these suffixes would be sent to the LLM provider on every
+# request. Consumers that genuinely need the value (tools/email.py) read the row
+# straight from the table.
+SECRET_KEY_SUFFIXES = ("_password", "_token", "_secret", "_key")
+
+
+def is_secret_key(key: str) -> bool:
+    return key.lower().endswith(SECRET_KEY_SUFFIXES)
+
 
 def get_or_create_user(telegram_id: int, name: str) -> str:
     db = get_db()
@@ -52,9 +63,17 @@ def get_history(user_id: str) -> list[dict]:
 
 
 def read_memory(user_id: str) -> dict:
+    """Facts about the user for the system prompt.
+
+    Secret values are masked, not dropped: the model still needs to know a credential
+    is on file (otherwise it keeps asking the user for it), but must never see it.
+    """
     db = get_db()
     result = db.table("user_memory").select("key,value").eq("user_id", user_id).execute()
-    return {row["key"]: row["value"] for row in result.data}
+    return {
+        row["key"]: "<saved, hidden from the model>" if is_secret_key(row["key"]) else row["value"]
+        for row in result.data
+    }
 
 
 def save_memory(user_id: str, key: str, value: str) -> str:
@@ -65,6 +84,9 @@ def save_memory(user_id: str, key: str, value: str) -> str:
         "value": value,
         "updated_at": "now()",
     }, on_conflict="user_id,key").execute()
+    if is_secret_key(key):
+        # The return value is shown in chat and stored in `messages`.
+        return f"Saved: {key} (value hidden)"
     return f"Saved: {key} = {value}"
 
 

@@ -180,7 +180,7 @@ TOOLS = [
                     "name": {"type": "string", "description": "Contact's full name"},
                     "phone": {"type": "string", "description": "Phone number"},
                     "email": {"type": "string", "description": "Email address"},
-                    "telegram_id": {"type": "integer", "description": "Numeric Telegram user ID (required for broadcasts). Use when user provides a number like 358249169"},
+                    "telegram_id": {"type": "integer", "description": "Numeric Telegram user ID (required for broadcasts). Use when user provides a number like 123456789"},
                     "telegram_username": {"type": "string", "description": "Telegram @username without @. Use only if numeric telegram_id is unknown"},
                     "company": {"type": "string", "description": "Company name"},
                     "role": {"type": "string", "description": "Job title/role"},
