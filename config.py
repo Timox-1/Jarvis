@@ -7,6 +7,7 @@ TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
 BOTHUB_API_KEY = os.environ["BOTHUB_API_KEY"]
 BOTHUB_BASE_URL = "https://bothub.chat/api/v2/openai/v1"
 GPT_MODEL = "gpt-4o"
+WHISPER_MODEL = os.getenv("WHISPER_MODEL", "assembly-ai-nano")
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_KEY"]

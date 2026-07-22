@@ -1,10 +1,13 @@
 import os
+import subprocess
 from pathlib import Path
 from telegram import Update
 from telegram.ext import ContextTypes
+from openai import AsyncOpenAI
 from tools.memory import get_or_create_user, is_user_allowed, save_message, get_history, clear_history
 from tools.files import get_file_text
 from bot.agent import run_agent
+from config import BOTHUB_API_KEY, BOTHUB_BASE_URL, WHISPER_MODEL
 
 DOWNLOADS_DIR = Path("downloads")
 DOWNLOADS_DIR.mkdir(exist_ok=True)
@@ -147,6 +150,52 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     os.remove(file_path)
 
 
+def _convert_ogg_to_mp3(ogg_path: Path) -> Path:
+    mp3_path = ogg_path.with_suffix(".mp3")
+    result = subprocess.run(
+        [
+            "ffmpeg", "-y", "-i", str(ogg_path),
+            "-ac", "1", "-ar", "16000",
+            "-codec:a", "libmp3lame", "-q:a", "4",
+            str(mp3_path),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0 or not mp3_path.exists():
+        raise RuntimeError(result.stderr.strip() or "ffmpeg conversion failed")
+    return mp3_path
+
+
+async def _transcribe_audio(mp3_path: Path) -> str:
+    fallbacks = (
+        ("https://openai.bothub.chat/v1", "whisper-1"),
+        (BOTHUB_BASE_URL, "assembly-ai-best"),
+        (BOTHUB_BASE_URL, WHISPER_MODEL),
+    )
+    errors = []
+
+    for base_url, model in fallbacks:
+        client = AsyncOpenAI(api_key=BOTHUB_API_KEY, base_url=base_url)
+        try:
+            with open(mp3_path, "rb") as audio_file:
+                transcription = await client.audio.transcriptions.create(
+                    model=model,
+                    file=audio_file,
+                    language="ru",
+                )
+            text = (transcription.text or "").strip()
+            if text:
+                print(f"[voice transcribe ok] model={model} base={base_url}")
+                return text
+            errors.append(f"{model}@{base_url}: empty transcript")
+        except Exception as e:
+            errors.append(f"{model}@{base_url}: {e}")
+
+    raise RuntimeError("; ".join(errors))
+
+
 async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     if not is_user_allowed(user.id):
@@ -159,21 +208,12 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     voice = update.message.voice
     file = await context.bot.get_file(voice.file_id)
     file_path = DOWNLOADS_DIR / f"{voice.file_id}.ogg"
-    await file.download_to_drive(file_path)
+    mp3_path = None
 
     try:
-        from openai import AsyncOpenAI
-        from config import BOTHUB_API_KEY, BOTHUB_BASE_URL
-
-        client = AsyncOpenAI(api_key=BOTHUB_API_KEY, base_url=BOTHUB_BASE_URL)
-        with open(file_path, "rb") as audio_file:
-            transcription = await client.audio.transcriptions.create(
-                model="whisper-1",
-                file=audio_file,
-                language="ru",
-            )
-
-        text = transcription.text.strip()
+        await file.download_to_drive(file_path)
+        mp3_path = _convert_ogg_to_mp3(file_path)
+        text = await _transcribe_audio(mp3_path)
         if not text:
             await update.message.reply_text("Не удалось распознать голос. Попробуй ещё раз.")
             return
@@ -182,13 +222,29 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
         history = get_history(user_id)
         save_message(user_id, "user", text)
-        response = await run_agent(user_id, text, history, bot=context.bot)
-        save_message(user_id, "assistant", response)
+
+        error_response = None
+        try:
+            response = await run_agent(user_id, text, history, bot=context.bot)
+        except Exception as e:
+            print(f"[voice agent error] user={user_id}: {e}")
+            error_response = "Произошла ошибка при обработке голосового. Попробуй ещё раз."
+            response = error_response
+
+        if not error_response:
+            save_message(user_id, "assistant", response)
+
         await _safe_reply(update.message, response)
 
+    except Exception as e:
+        print(f"[voice error] user={user_id}: {e}")
+        await update.message.reply_text(
+            "Не удалось обработать голосовое. Попробуй ещё раз или напиши текстом."
+        )
     finally:
-        if file_path.exists():
-            os.remove(file_path)
+        for path in (file_path, mp3_path):
+            if path and path.exists():
+                os.remove(path)
 
 
 async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
