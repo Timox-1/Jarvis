@@ -3,7 +3,10 @@ from openai import AsyncOpenAI
 from config import BOTHUB_API_KEY, BOTHUB_BASE_URL, GPT_MODEL
 from tools import TOOLS
 from tools.memory import save_memory, forget_memory, read_memory
-from tools.browser import browser_navigate, browser_click, browser_type, browser_press, browser_get_text
+from tools.browser import (
+    browser_navigate, browser_click, browser_type, browser_press, browser_get_text,
+    browser_send_screenshot, deliver_screenshot_to_user,
+)
 from tools.n8n import call_integration, list_integrations_for_user
 from tools.reminders import set_reminder, list_reminders, delete_reminder
 from tools.search import web_search
@@ -265,6 +268,23 @@ async def _execute_tool(tool_name: str, args: dict, user_id: str, bot=None) -> s
         if result["status"] == "error":
             return f"Get text error: {result['error']}"
         return result["text"]
+
+    if tool_name == "browser_send_screenshot":
+        if not bot:
+            return "Error: Telegram bot unavailable, cannot send screenshot"
+        result = await browser_send_screenshot(args.get("url"))
+        if result["status"] == "error":
+            return f"Screenshot error: {result['error']}"
+        send_result = await deliver_screenshot_to_user(
+            bot, user_id, result["screenshot_bytes"], args.get("caption"),
+        )
+        if send_result["status"] == "error":
+            return f"Send error: {send_result['error']}"
+        return json.dumps({
+            "status": "ok",
+            "url": result["url"],
+            "message": "Скриншот отправлен пользователю в Telegram",
+        }, ensure_ascii=False)
 
     # --- Integrations ---
     if tool_name == "list_integrations":

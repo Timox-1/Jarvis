@@ -87,6 +87,47 @@ async def browser_get_text() -> dict:
         return {"status": "error", "error": str(e)}
 
 
+async def browser_send_screenshot(url: str | None = None) -> dict:
+    """Capture current page (optionally after navigating) for delivery to the user."""
+    if url:
+        nav = await browser_navigate(url)
+        if nav["status"] == "error":
+            return nav
+    elif _page is None or _page.is_closed():
+        return {
+            "status": "error",
+            "error": "Браузер не открыт. Укажи url или сначала вызови browser_navigate.",
+        }
+
+    page = await _get_page()
+    try:
+        screenshot_bytes = await page.screenshot(full_page=False)
+        return {"status": "ok", "url": page.url, "screenshot_bytes": screenshot_bytes}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
+async def deliver_screenshot_to_user(bot, user_id: str, screenshot_bytes: bytes, caption: str | None = None) -> dict:
+    """Send PNG screenshot bytes to the user's Telegram chat."""
+    from io import BytesIO
+    from db.client import get_db
+
+    db = get_db()
+    result = db.table("users").select("telegram_id").eq("id", user_id).execute()
+    if not result.data:
+        return {"status": "error", "error": "User not found"}
+
+    telegram_id = result.data[0]["telegram_id"]
+    photo = BytesIO(screenshot_bytes)
+    photo.name = "screenshot.png"
+
+    try:
+        await bot.send_photo(chat_id=telegram_id, photo=photo, caption=caption)
+        return {"status": "ok"}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
 async def browser_close() -> dict:
     global _page
     if _page and not _page.is_closed():

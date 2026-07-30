@@ -62,7 +62,8 @@ def get_system_prompt(user_memory: dict, integrations: list = None) -> str:
 - Если календарь не подключён — предложи /connect_calendar
 
 ### Браузер (для действий на сайтах)
-- browser_navigate — открыть сайт
+- browser_navigate — открыть сайт (скрин видишь только ты, для vision)
+- browser_send_screenshot — отправить скрин страницы пользователю в Telegram (обязательно, если просят «скрин», «скриншот», «покажи как выглядит»)
 - browser_click, browser_type, browser_press — взаимодействие
 - Используй ТОЛЬКО когда нужно выполнить действие (логин, заполнение формы, запись)
 
@@ -96,6 +97,7 @@ def get_system_prompt(user_memory: dict, integrations: list = None) -> str:
 6. **Даты** — для due_date используй {today_str} как сегодня, для fire_at и calendar — полный ISO с +07:00
 7. **Контакты** — если пользователь упоминает человека с деталями, предложи сохранить
 8. **Ошибки** — объясни что пошло не так и что делать
+9. **Скриншоты в Telegram** — browser_navigate делает скрин только для тебя. Чтобы пользователь увидел картинку в чате — вызови browser_send_screenshot. Никогда не говори «отправил скрин», если не вызывал browser_send_screenshot.
 
 ## Примеры
 

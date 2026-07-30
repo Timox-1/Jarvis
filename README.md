@@ -91,6 +91,8 @@ Supabase            диалог пишется в messages
 ### Прочее
 `web_search` (DuckDuckGo, без ключа) · `save_memory` · `forget_memory` · `list_integrations` · `call_integration` (произвольный n8n webhook)
 
+**Скриншоты:** `browser_navigate` делает скрин для vision модели; `browser_send_screenshot` отправляет PNG пользователю в Telegram.
+
 ### Команды
 
 | Команда | Что делает |

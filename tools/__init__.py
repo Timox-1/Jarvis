@@ -361,6 +361,27 @@ TOOLS = [
             "parameters": {"type": "object", "properties": {}, "required": []},
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "browser_send_screenshot",
+            "description": "Send a screenshot of the browser page to the user in Telegram. REQUIRED when user asks for a screenshot/screen capture or wants to see what a page looks like. browser_navigate screenshots are for the model only — this tool delivers the image to the chat.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": "Optional URL to open before capture. If omitted, uses the current browser page.",
+                    },
+                    "caption": {
+                        "type": "string",
+                        "description": "Optional caption shown under the photo in Telegram",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
 
     # --- Broadcasts ---
     {
