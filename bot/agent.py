@@ -1,4 +1,5 @@
 import json
+import base64
 from openai import AsyncOpenAI
 from config import BOTHUB_API_KEY, BOTHUB_BASE_URL, GPT_MODEL
 from tools import TOOLS
@@ -28,7 +29,12 @@ client = AsyncOpenAI(api_key=BOTHUB_API_KEY, base_url=BOTHUB_BASE_URL)
 MAX_TOOL_ROUNDS = 10
 
 
-async def _execute_tool(tool_name: str, args: dict, user_id: str, bot=None) -> str:
+def _user_wants_screenshot(text: str) -> bool:
+    t = text.lower()
+    return any(k in t for k in ("скрин", "screenshot", "screen shot", "скриншот"))
+
+
+async def _execute_tool(tool_name: str, args: dict, user_id: str, bot=None, chat_id: int = None) -> str:
     # --- Memory ---
     if tool_name == "save_memory":
         return save_memory(user_id, args["key"], args["value"])
@@ -270,20 +276,15 @@ async def _execute_tool(tool_name: str, args: dict, user_id: str, bot=None) -> s
         return result["text"]
 
     if tool_name == "browser_send_screenshot":
-        if not bot:
-            return "Error: Telegram bot unavailable, cannot send screenshot"
         result = await browser_send_screenshot(args.get("url"))
         if result["status"] == "error":
             return f"Screenshot error: {result['error']}"
-        send_result = await deliver_screenshot_to_user(
-            bot, user_id, result["screenshot_bytes"], args.get("caption"),
-        )
-        if send_result["status"] == "error":
-            return f"Send error: {send_result['error']}"
         return json.dumps({
             "status": "ok",
             "url": result["url"],
-            "message": "Скриншот отправлен пользователю в Telegram",
+            "screenshot_base64": base64.b64encode(result["screenshot_bytes"]).decode(),
+            "deliver_to_user": True,
+            "caption": args.get("caption"),
         }, ensure_ascii=False)
 
     # --- Integrations ---
@@ -318,7 +319,7 @@ def _make_vision_message(role: str, content: str, screenshot_b64: str | None = N
     return {"role": role, "content": content}
 
 
-async def run_agent(user_id: str, user_message: str, history: list[dict], bot=None) -> str:
+async def run_agent(user_id: str, user_message: str, history: list[dict], bot=None, chat_id: int = None) -> str:
     memory = read_memory(user_id)
     integrations = list_integrations_for_user(user_id)
     system_prompt = get_system_prompt(memory, integrations)
@@ -347,17 +348,39 @@ async def run_agent(user_id: str, user_message: str, history: list[dict], bot=No
             tool_name = tool_call.function.name
             args = json.loads(tool_call.function.arguments)
 
-            tool_result = await _execute_tool(tool_name, args, user_id, bot)
+            tool_result = await _execute_tool(tool_name, args, user_id, bot, chat_id)
 
             screenshot_b64 = None
+            deliver_to_user = False
+            photo_caption = None
             try:
                 parsed = json.loads(tool_result)
                 screenshot_b64 = parsed.get("screenshot_base64")
+                deliver_to_user = parsed.get("deliver_to_user") or (
+                    bool(screenshot_b64) and _user_wants_screenshot(user_message)
+                )
+                photo_caption = parsed.get("caption")
                 if screenshot_b64:
                     parsed.pop("screenshot_base64", None)
-                    tool_result = json.dumps(parsed)
+                    parsed.pop("deliver_to_user", None)
+                    parsed.pop("caption", None)
+                    tool_result = json.dumps(parsed, ensure_ascii=False)
             except (json.JSONDecodeError, AttributeError):
                 pass
+
+            if screenshot_b64 and deliver_to_user and bot and chat_id:
+                send_result = await deliver_screenshot_to_user(
+                    bot, chat_id, base64.b64decode(screenshot_b64), photo_caption,
+                )
+                if send_result["status"] == "error":
+                    tool_result = f"Send error: {send_result['error']}"
+                else:
+                    try:
+                        parsed_out = json.loads(tool_result)
+                        parsed_out["telegram_photo_sent"] = True
+                        tool_result = json.dumps(parsed_out, ensure_ascii=False)
+                    except json.JSONDecodeError:
+                        tool_result = f"{tool_result} [telegram_photo_sent: true]"
 
             messages.append({
                 "role": "tool",

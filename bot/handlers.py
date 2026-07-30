@@ -37,7 +37,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     error_response = None
     try:
-        response = await run_agent(user_id, text, history, bot=context.bot)
+        response = await run_agent(user_id, text, history, bot=context.bot, chat_id=update.effective_chat.id)
     except Exception as e:
         print(f"[agent error] user={user_id}: {e}")
         error_response = "Произошла ошибка при обработке запроса. Попробуй ещё раз."
@@ -79,7 +79,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     error_response = None
     try:
-        response = await run_agent(user_id, user_message, history, bot=context.bot)
+        response = await run_agent(user_id, user_message, history, bot=context.bot, chat_id=update.effective_chat.id)
     except Exception as e:
         print(f"[document agent error] user={user_id}: {e}")
         error_response = "Произошла ошибка при обработке файла. Попробуй ещё раз."
@@ -225,7 +225,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
         error_response = None
         try:
-            response = await run_agent(user_id, text, history, bot=context.bot)
+            response = await run_agent(user_id, text, history, bot=context.bot, chat_id=update.effective_chat.id)
         except Exception as e:
             print(f"[voice agent error] user={user_id}: {e}")
             error_response = "Произошла ошибка при обработке голосового. Попробуй ещё раз."

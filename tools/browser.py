@@ -107,24 +107,21 @@ async def browser_send_screenshot(url: str | None = None) -> dict:
         return {"status": "error", "error": str(e)}
 
 
-async def deliver_screenshot_to_user(bot, user_id: str, screenshot_bytes: bytes, caption: str | None = None) -> dict:
+async def deliver_screenshot_to_user(
+    bot, chat_id: int, screenshot_bytes: bytes, caption: str | None = None,
+) -> dict:
     """Send PNG screenshot bytes to the user's Telegram chat."""
     from io import BytesIO
-    from db.client import get_db
+    from telegram import InputFile
 
-    db = get_db()
-    result = db.table("users").select("telegram_id").eq("id", user_id).execute()
-    if not result.data:
-        return {"status": "error", "error": "User not found"}
-
-    telegram_id = result.data[0]["telegram_id"]
-    photo = BytesIO(screenshot_bytes)
-    photo.name = "screenshot.png"
+    photo = InputFile(BytesIO(screenshot_bytes), filename="screenshot.png")
 
     try:
-        await bot.send_photo(chat_id=telegram_id, photo=photo, caption=caption)
+        await bot.send_photo(chat_id=chat_id, photo=photo, caption=caption)
+        print(f"[screenshot] sent to chat_id={chat_id} ({len(screenshot_bytes)} bytes)")
         return {"status": "ok"}
     except Exception as e:
+        print(f"[screenshot error] chat_id={chat_id}: {e}")
         return {"status": "error", "error": str(e)}
 
 
