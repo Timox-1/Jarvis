@@ -34,7 +34,7 @@ def _user_wants_screenshot(text: str) -> bool:
     return any(k in t for k in ("скрин", "screenshot", "screen shot", "скриншот"))
 
 
-async def _execute_tool(tool_name: str, args: dict, user_id: str, bot=None, chat_id: int = None) -> str:
+async def _execute_tool(tool_name: str, args: dict, user_id: str, delivery=None) -> str:
     # --- Memory ---
     if tool_name == "save_memory":
         return save_memory(user_id, args["key"], args["value"])
@@ -142,9 +142,11 @@ async def _execute_tool(tool_name: str, args: dict, user_id: str, bot=None, chat
         return json.dumps(result, ensure_ascii=False)
 
     if tool_name == "confirm_broadcast":
-        if not bot:
-            return json.dumps({"status": "error", "error": "Bot not available for broadcast"})
-        result = await confirm_broadcast(bot, user_id, args.get("broadcast_id"))
+        from channels.router import get_router
+        tg = get_router().get("telegram")
+        if not tg or not getattr(tg, "bot", None):
+            return json.dumps({"status": "error", "error": "Telegram bot not available for broadcast"})
+        result = await confirm_broadcast(tg.bot, user_id, args.get("broadcast_id"))
         return json.dumps(result, ensure_ascii=False)
 
     if tool_name == "get_broadcast_history":
@@ -319,7 +321,7 @@ def _make_vision_message(role: str, content: str, screenshot_b64: str | None = N
     return {"role": role, "content": content}
 
 
-async def run_agent(user_id: str, user_message: str, history: list[dict], bot=None, chat_id: int = None) -> str:
+async def run_agent(user_id: str, user_message: str, history: list[dict], delivery=None) -> str:
     memory = read_memory(user_id)
     integrations = list_integrations_for_user(user_id)
     system_prompt = get_system_prompt(memory, integrations)
@@ -348,7 +350,7 @@ async def run_agent(user_id: str, user_message: str, history: list[dict], bot=No
             tool_name = tool_call.function.name
             args = json.loads(tool_call.function.arguments)
 
-            tool_result = await _execute_tool(tool_name, args, user_id, bot, chat_id)
+            tool_result = await _execute_tool(tool_name, args, user_id, delivery)
 
             screenshot_b64 = None
             deliver_to_user = False
@@ -368,19 +370,22 @@ async def run_agent(user_id: str, user_message: str, history: list[dict], bot=No
             except (json.JSONDecodeError, AttributeError):
                 pass
 
-            if screenshot_b64 and deliver_to_user and bot and chat_id:
+            if screenshot_b64 and deliver_to_user and delivery:
                 send_result = await deliver_screenshot_to_user(
-                    bot, chat_id, base64.b64decode(screenshot_b64), photo_caption,
+                    delivery.channel,
+                    delivery.external_id,
+                    base64.b64decode(screenshot_b64),
+                    photo_caption,
                 )
                 if send_result["status"] == "error":
                     tool_result = f"Send error: {send_result['error']}"
                 else:
                     try:
                         parsed_out = json.loads(tool_result)
-                        parsed_out["telegram_photo_sent"] = True
+                        parsed_out["photo_sent"] = True
                         tool_result = json.dumps(parsed_out, ensure_ascii=False)
                     except json.JSONDecodeError:
-                        tool_result = f"{tool_result} [telegram_photo_sent: true]"
+                        tool_result = f"{tool_result} [photo_sent: true]"
 
             messages.append({
                 "role": "tool",

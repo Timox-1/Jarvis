@@ -108,20 +108,20 @@ async def browser_send_screenshot(url: str | None = None) -> dict:
 
 
 async def deliver_screenshot_to_user(
-    bot, chat_id: int, screenshot_bytes: bytes, caption: str | None = None,
+    channel: str,
+    external_id: str,
+    screenshot_bytes: bytes,
+    caption: str | None = None,
 ) -> dict:
-    """Send PNG screenshot bytes to the user's Telegram chat."""
-    from io import BytesIO
-    from telegram import InputFile
-
-    photo = InputFile(BytesIO(screenshot_bytes), filename="screenshot.png")
+    """Send PNG screenshot bytes to the user via the active channel adapter."""
+    from channels.router import get_router
 
     try:
-        await bot.send_photo(chat_id=chat_id, photo=photo, caption=caption)
-        print(f"[screenshot] sent to chat_id={chat_id} ({len(screenshot_bytes)} bytes)")
+        await get_router().send_photo(channel, external_id, screenshot_bytes, caption=caption)
+        print(f"[screenshot] sent via {channel}/{external_id} ({len(screenshot_bytes)} bytes)")
         return {"status": "ok"}
     except Exception as e:
-        print(f"[screenshot error] chat_id={chat_id}: {e}")
+        print(f"[screenshot error] {channel}/{external_id}: {e}")
         return {"status": "error", "error": str(e)}
 
 

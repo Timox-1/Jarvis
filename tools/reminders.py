@@ -44,7 +44,10 @@ def delete_reminder(user_id: str, reminder_id: str) -> str:
     return f"Напоминание удалено: {reminder['text']}"
 
 
-async def check_and_fire_reminders(bot) -> None:
+async def check_and_fire_reminders(_bot=None) -> None:
+    """Fire due reminders via ChannelRouter (all linked identities)."""
+    from channels.router import get_router
+
     db = get_db()
     now = datetime.now(timezone.utc).isoformat()
 
@@ -57,19 +60,14 @@ async def check_and_fire_reminders(bot) -> None:
     if not reminders:
         return
 
-    user_ids = list({r["user_id"] for r in reminders})
-    users = (db.table("users")
-             .select("id, telegram_id")
-             .in_("id", user_ids)
-             .execute()).data
-    user_map = {u["id"]: u["telegram_id"] for u in users}
-
+    router = get_router()
     for reminder in reminders:
-        telegram_id = user_map.get(reminder["user_id"])
-        if not telegram_id:
-            continue
         try:
-            await bot.send_message(chat_id=telegram_id, text=f"⏰ {reminder['text']}")
-            db.table("reminders").update({"done": True}).eq("id", reminder["id"]).execute()
-        except Exception:
-            pass
+            sent = await router.send_text_to_user(
+                reminder["user_id"],
+                f"⏰ {reminder['text']}",
+            )
+            if sent:
+                db.table("reminders").update({"done": True}).eq("id", reminder["id"]).execute()
+        except Exception as e:
+            print(f"[reminder] fire error id={reminder['id']}: {e}")

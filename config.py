@@ -19,5 +19,12 @@ ALLOWED_TELEGRAM_IDS = [
     int(x) for x in os.getenv("ALLOWED_TELEGRAM_IDS", "").split(",") if x
 ]
 
+# Contact shown when access is denied (Telegram @username or text)
+ACCESS_CONTACT = os.getenv("ACCESS_CONTACT", "@TimohTG")
+
+# VK community bot (optional — Long Poll starts only if token is set)
+VK_GROUP_TOKEN = os.getenv("VK_GROUP_TOKEN", "")
+VK_GROUP_ID = os.getenv("VK_GROUP_ID", "")
+
 YANDEX_CALENDAR_CLIENT_ID = os.environ["YANDEX_CALENDAR_CLIENT_ID"]
 YANDEX_CALENDAR_CLIENT_SECRET = os.environ["YANDEX_CALENDAR_CLIENT_SECRET"]

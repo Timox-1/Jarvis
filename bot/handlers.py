@@ -4,13 +4,46 @@ from pathlib import Path
 from telegram import Update
 from telegram.ext import ContextTypes
 from openai import AsyncOpenAI
-from tools.memory import get_or_create_user, is_user_allowed, save_message, get_history, clear_history
+from tools.memory import (
+    get_or_create_user,
+    is_user_allowed,
+    save_message,
+    clear_history,
+    access_denied_text,
+    invite_user,
+    link_identity,
+    find_user_id_by_telegram,
+    VALID_PLANS,
+)
 from tools.files import get_file_text
-from bot.agent import run_agent
-from config import BOTHUB_API_KEY, BOTHUB_BASE_URL, WHISPER_MODEL
+from bot.process import process_text
+from channels.base import DeliveryContext
+from channels.router import get_router
+from config import BOTHUB_API_KEY, BOTHUB_BASE_URL, WHISPER_MODEL, ADMIN_TELEGRAM_IDS, ALLOWED_TELEGRAM_IDS
 
 DOWNLOADS_DIR = Path("downloads")
 DOWNLOADS_DIR.mkdir(exist_ok=True)
+
+ONBOARDING = (
+    "Привет! Я Джарвис — личный ИИ-ассистент.\n\n"
+    "Умею:\n"
+    "• задачи, напоминания, утренний брифинг в 09:00\n"
+    "• Яндекс Календарь — /connect_calendar\n"
+    "• почту, контакты, заметки, учёт расходов\n"
+    "• голос, фото, PDF, браузер\n\n"
+    "Просто напиши обычным языком. Голосовые тоже ок.\n\n"
+    "/status — сводка дня\n"
+    "/connect_calendar — Яндекс Календарь\n"
+    "/clear — очистить историю"
+)
+
+
+def _delivery(update: Update) -> DeliveryContext:
+    return DeliveryContext(channel="telegram", external_id=str(update.effective_user.id))
+
+
+def _is_admin(telegram_id: int) -> bool:
+    return telegram_id in ADMIN_TELEGRAM_IDS or telegram_id in ALLOWED_TELEGRAM_IDS
 
 
 async def _safe_reply(message, text: str) -> None:
@@ -21,41 +54,32 @@ async def _safe_reply(message, text: str) -> None:
         await message.reply_text(text)
 
 
+async def _deny_if_needed(update: Update) -> bool:
+    """Return True if access denied (and reply sent). Still registers inactive user on /start path."""
+    user = update.effective_user
+    if is_user_allowed("telegram", user.id):
+        return False
+    await update.message.reply_text(access_denied_text())
+    return True
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    if not is_user_allowed(user.id):
-        await update.message.reply_text("Доступ закрыт. Обратитесь к администратору.")
+    if await _deny_if_needed(update):
         return
 
-    user_id = get_or_create_user(user.id, user.full_name)
+    user_id = get_or_create_user("telegram", user.id, user.full_name)
     text = update.message.text or ""
-
-    await context.bot.send_chat_action(update.effective_chat.id, "typing")
-
-    history = get_history(user_id)
-    save_message(user_id, "user", text)
-
-    error_response = None
-    try:
-        response = await run_agent(user_id, text, history, bot=context.bot, chat_id=update.effective_chat.id)
-    except Exception as e:
-        print(f"[agent error] user={user_id}: {e}")
-        error_response = "Произошла ошибка при обработке запроса. Попробуй ещё раз."
-        response = error_response
-
-    if not error_response:
-        save_message(user_id, "assistant", response)
-
+    response = await process_text(user_id, text, _delivery(update))
     await _safe_reply(update.message, response)
 
 
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    if not is_user_allowed(user.id):
-        await update.message.reply_text("Доступ закрыт.")
+    if await _deny_if_needed(update):
         return
 
-    user_id = get_or_create_user(user.id, user.full_name)
+    user_id = get_or_create_user("telegram", user.id, user.full_name)
     doc = update.message.document
     caption = update.message.caption or "Обработай этот файл"
 
@@ -73,34 +97,20 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     else:
         user_message = caption
 
-    await context.bot.send_chat_action(update.effective_chat.id, "typing")
-    history = get_history(user_id)
-    save_message(user_id, "user", user_message)
-
-    error_response = None
     try:
-        response = await run_agent(user_id, user_message, history, bot=context.bot, chat_id=update.effective_chat.id)
-    except Exception as e:
-        print(f"[document agent error] user={user_id}: {e}")
-        error_response = "Произошла ошибка при обработке файла. Попробуй ещё раз."
-        response = error_response
+        response = await process_text(user_id, user_message, _delivery(update))
+        await _safe_reply(update.message, response)
     finally:
         if file_path.exists():
             os.remove(file_path)
 
-    if not error_response:
-        save_message(user_id, "assistant", response)
-
-    await _safe_reply(update.message, response)
-
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    if not is_user_allowed(user.id):
-        await update.message.reply_text("Доступ закрыт.")
+    if await _deny_if_needed(update):
         return
 
-    user_id = get_or_create_user(user.id, user.full_name)
+    user_id = get_or_create_user("telegram", user.id, user.full_name)
     caption = update.message.caption or "Что на этом фото?"
 
     photo = update.message.photo[-1]
@@ -113,10 +123,9 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.message.reply_text(f"Ошибка: {file_info['error']}")
         return
 
-    await context.bot.send_chat_action(update.effective_chat.id, "typing")
+    await get_router().send_typing("telegram", str(user.id))
 
-    from openai import AsyncOpenAI
-    from config import BOTHUB_API_KEY, BOTHUB_BASE_URL, GPT_MODEL
+    from config import GPT_MODEL
     from system_prompt import get_system_prompt
     from tools.memory import read_memory
 
@@ -143,7 +152,6 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     )
     response = response_obj.choices[0].message.content or ""
 
-    history = get_history(user_id)
     save_message(user_id, "user", f"{caption} [фото]")
     save_message(user_id, "assistant", response)
     await _safe_reply(update.message, response)
@@ -198,12 +206,11 @@ async def _transcribe_audio(mp3_path: Path) -> str:
 
 async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    if not is_user_allowed(user.id):
-        await update.message.reply_text("Доступ закрыт.")
+    if await _deny_if_needed(update):
         return
 
-    user_id = get_or_create_user(user.id, user.full_name)
-    await context.bot.send_chat_action(update.effective_chat.id, "typing")
+    user_id = get_or_create_user("telegram", user.id, user.full_name)
+    await get_router().send_typing("telegram", str(user.id))
 
     voice = update.message.voice
     file = await context.bot.get_file(voice.file_id)
@@ -219,21 +226,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             return
 
         await update.message.reply_text(f"🎤 {text}")
-
-        history = get_history(user_id)
-        save_message(user_id, "user", text)
-
-        error_response = None
-        try:
-            response = await run_agent(user_id, text, history, bot=context.bot, chat_id=update.effective_chat.id)
-        except Exception as e:
-            print(f"[voice agent error] user={user_id}: {e}")
-            error_response = "Произошла ошибка при обработке голосового. Попробуй ещё раз."
-            response = error_response
-
-        if not error_response:
-            save_message(user_id, "assistant", response)
-
+        response = await process_text(user_id, text, _delivery(update))
         await _safe_reply(update.message, response)
 
     except Exception as e:
@@ -248,64 +241,45 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(
-        "Привет! Я твой личный ИИ-ассистент.\n\n"
-        "📋 Задачи и планирование:\n"
-        "• «Запиши задачу: ...»\n"
-        "• «Что у меня сегодня?»\n"
-        "• «Напомни завтра в 10...»\n"
-        "• «Перенеси задачу на пятницу»\n\n"
-        "👥 Контакты и рассылки:\n"
-        "• «Добавь контакт: Иван, +7...»\n"
-        "• «Добавь Ивана в группу Клиенты»\n"
-        "• «Разошли клиентам: ...»\n\n"
-        "💰 Финансы:\n"
-        "• «Клиент оплатил 50000₽»\n"
-        "• «Потратил 3000 на такси»\n"
-        "• «Покажи финансовую сводку за месяц»\n\n"
-        "📅 Яндекс Календарь:\n"
-        "• «Что у меня в календаре на неделе?»\n"
-        "• «Запиши встречу на завтра в 15:00»\n\n"
-        "🌐 Действия в интернете:\n"
-        "• «Запиши меня к врачу»\n"
-        "• «Заполни форму на сайте»\n\n"
-        "📄 Файлы и фото — просто отправь\n\n"
-        "/status — быстрый дашборд\n"
-        "/connect_calendar — подключить Яндекс Календарь\n"
-        "/clear — очистить историю\n\n"
-        "Просто напиши что нужно!"
-    )
+    user = update.effective_user
+    get_or_create_user("telegram", user.id, user.full_name)
+    if not is_user_allowed("telegram", user.id):
+        await update.message.reply_text(access_denied_text())
+        return
+    await update.message.reply_text(ONBOARDING)
 
 
 async def handle_clear(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    if not is_user_allowed(user.id):
-        await update.message.reply_text("Доступ закрыт.")
+    if await _deny_if_needed(update):
         return
 
-    user_id = get_or_create_user(user.id, user.full_name)
+    user_id = get_or_create_user("telegram", user.id, user.full_name)
     count = clear_history(user_id)
 
     from tools.browser import browser_close
     await browser_close()
 
-    await update.message.reply_text(f"История очищена ({count} сообщений удалено). Браузер сброшен. Начинаем с чистого листа!")
+    await update.message.reply_text(
+        f"История очищена ({count} сообщений удалено). Браузер сброшен. Начинаем с чистого листа!"
+    )
 
 
 async def handle_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    if not is_user_allowed(user.id):
-        await update.message.reply_text("Доступ закрыт.")
+    if await _deny_if_needed(update):
         return
 
-    user_id = get_or_create_user(user.id, user.full_name)
+    user_id = get_or_create_user("telegram", user.id, user.full_name)
 
     from tools.tasks import get_today_summary
     from tools.reminders import list_reminders
+    from tools.memory import get_user_profile
     from db.client import get_db
 
     summary = get_today_summary(user_id)
     reminders = list_reminders(user_id)
+    profile = get_user_profile(user_id)
 
     db = get_db()
     cal_connected = bool(
@@ -329,18 +303,21 @@ async def handle_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     lines.append(f"⏰ Активных напоминаний: *{len(reminders)}*")
     cal_status = "подключён ✅" if cal_connected else "не подключён — /connect\\_calendar"
     lines.append(f"📆 Яндекс Календарь: {cal_status}")
+    if profile:
+        plan = profile.get("plan") or "—"
+        paid = profile.get("paid_until") or "—"
+        lines.append(f"🎫 Тариф: *{plan}* (до {paid})" if paid != "—" else f"🎫 Тариф: *{plan}*")
 
     await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
 
 async def handle_connect_calendar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    if not is_user_allowed(user.id):
-        await update.message.reply_text("Доступ закрыт.")
+    if await _deny_if_needed(update):
         return
 
     from config import YANDEX_CALENDAR_CLIENT_ID
-    user_id = get_or_create_user(user.id, user.full_name)
+    user_id = get_or_create_user("telegram", user.id, user.full_name)
 
     oauth_url = (
         "https://oauth.yandex.ru/authorize"
@@ -356,3 +333,128 @@ async def handle_connect_calendar(update: Update, context: ContextTypes.DEFAULT_
         f"Нажми на ссылку и войди в Яндекс:\n{oauth_url}\n\n"
         "После входа вернись сюда — бот подтвердит подключение."
     )
+
+
+async def handle_invite(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Admin: /invite <telegram_id> [plan] [paid_until=YYYY-MM-DD]"""
+    user = update.effective_user
+    if not _is_admin(user.id):
+        await update.message.reply_text("Команда только для администратора.")
+        return
+
+    args = context.args or []
+    if not args:
+        await update.message.reply_text(
+            "Использование:\n"
+            "/invite <telegram_id> [plan] [YYYY-MM-DD]\n"
+            f"Планы: {', '.join(VALID_PLANS)}\n"
+            "Пример: /invite 123456789 trial\n"
+            "Пример: /invite 123456789 base 2026-09-01"
+        )
+        return
+
+    try:
+        telegram_id = int(args[0])
+    except ValueError:
+        await update.message.reply_text("telegram_id должен быть числом.")
+        return
+
+    plan = args[1] if len(args) > 1 else "trial"
+    paid_until = args[2] if len(args) > 2 else None
+
+    try:
+        result = invite_user("telegram", telegram_id, plan=plan, paid_until=paid_until)
+    except ValueError as e:
+        await update.message.reply_text(str(e))
+        return
+    except Exception as e:
+        await update.message.reply_text(f"Ошибка инвайта: {e}")
+        return
+
+    action = "создан" if result["created"] else "активирован"
+    await update.message.reply_text(
+        f"✅ Пользователь {action}\n"
+        f"TG: {result['external_id']}\n"
+        f"plan: {result['plan']}\n"
+        f"paid_until: {result['paid_until'] or '—'}\n"
+        f"user_id: {result['user_id']}"
+    )
+
+
+async def handle_invite_vk(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Admin: /invite_vk <vk_id> [plan] [paid_until=YYYY-MM-DD]"""
+    user = update.effective_user
+    if not _is_admin(user.id):
+        await update.message.reply_text("Команда только для администратора.")
+        return
+
+    args = context.args or []
+    if not args:
+        await update.message.reply_text(
+            "Использование:\n"
+            "/invite_vk <vk_id> [plan] [YYYY-MM-DD]\n"
+            "Пример: /invite_vk 12345678 trial"
+        )
+        return
+
+    try:
+        vk_id = int(args[0])
+    except ValueError:
+        await update.message.reply_text("vk_id должен быть числом.")
+        return
+
+    plan = args[1] if len(args) > 1 else "trial"
+    paid_until = args[2] if len(args) > 2 else None
+
+    try:
+        result = invite_user("vk", vk_id, plan=plan, paid_until=paid_until)
+    except ValueError as e:
+        await update.message.reply_text(str(e))
+        return
+    except Exception as e:
+        await update.message.reply_text(f"Ошибка инвайта: {e}")
+        return
+
+    action = "создан" if result["created"] else "активирован"
+    await update.message.reply_text(
+        f"✅ VK-пользователь {action}\n"
+        f"VK: {result['external_id']}\n"
+        f"plan: {result['plan']}\n"
+        f"paid_until: {result['paid_until'] or '—'}\n"
+        f"user_id: {result['user_id']}"
+    )
+
+
+async def handle_link_vk(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Admin: /link_vk <telegram_id> <vk_id> — same person, both channels."""
+    user = update.effective_user
+    if not _is_admin(user.id):
+        await update.message.reply_text("Команда только для администратора.")
+        return
+
+    args = context.args or []
+    if len(args) < 2:
+        await update.message.reply_text("Использование: /link_vk <telegram_id> <vk_id>")
+        return
+
+    try:
+        telegram_id = int(args[0])
+        vk_id = int(args[1])
+    except ValueError:
+        await update.message.reply_text("Оба ID должны быть числами.")
+        return
+
+    user_id = find_user_id_by_telegram(telegram_id)
+    if not user_id:
+        await update.message.reply_text(
+            f"Сначала /invite {telegram_id}, потом /link_vk."
+        )
+        return
+
+    try:
+        msg = link_identity(user_id, "vk", vk_id)
+    except ValueError as e:
+        await update.message.reply_text(str(e))
+        return
+
+    await update.message.reply_text(f"✅ {msg}")

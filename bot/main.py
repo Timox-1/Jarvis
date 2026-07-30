@@ -1,9 +1,23 @@
 import asyncio
 from datetime import datetime, timezone, timedelta, date
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
-from config import TELEGRAM_TOKEN
-from bot.handlers import handle_message, handle_document, handle_photo, handle_voice, handle_start, handle_clear, handle_connect_calendar, handle_status
+from config import TELEGRAM_TOKEN, VK_GROUP_TOKEN
+from bot.handlers import (
+    handle_message,
+    handle_document,
+    handle_photo,
+    handle_voice,
+    handle_start,
+    handle_clear,
+    handle_connect_calendar,
+    handle_status,
+    handle_invite,
+    handle_invite_vk,
+    handle_link_vk,
+)
 from tools.reminders import check_and_fire_reminders
+from channels.router import get_router
+from channels.telegram import TelegramAdapter
 
 KEMEROVO_TZ = timezone(timedelta(hours=7))
 
@@ -33,19 +47,20 @@ def _briefing_already_sent(db, user_id: str, since_utc: str) -> bool:
     return bool(sent)
 
 
-async def _send_morning_briefings(bot):
+async def _send_morning_briefings(_bot=None):
     from db.client import get_db
     from tools.memory import save_message
     from tools.tasks import get_today_summary
     from tools.calendar import list_events
+    from channels.router import get_router
 
     db = get_db()
-    users = db.table("users").select("id, telegram_id").eq("is_active", True).execute().data
+    users = db.table("users").select("id").eq("is_active", True).execute().data
+    router = get_router()
 
     today = date.today().isoformat()
     tomorrow = (date.today() + timedelta(days=1)).isoformat()
 
-    # Start of the current Kemerovo day, expressed in UTC — messages.created_at is UTC
     kemerovo_now = datetime.now(KEMEROVO_TZ)
     day_start_utc = (kemerovo_now.replace(hour=0, minute=0, second=0, microsecond=0)
                      .astimezone(timezone.utc).isoformat())
@@ -80,22 +95,20 @@ async def _send_morning_briefings(bot):
                     for e in events[:5]:
                         lines.append(f"  • {e.get('title', 'Без названия')} в {e.get('start', '')[:16]}")
             except Exception:
-                pass  # No calendar integration — skip silently
+                pass
 
             text = "\n".join(lines)
-            await bot.send_message(
-                chat_id=user["telegram_id"],
-                text=text,
-                parse_mode="Markdown"
-            )
-            # Into history, so "уже сделано" in reply has the task names to resolve against
+            sent = await router.send_text_to_user(user["id"], text, parse_mode="Markdown")
+            if not sent:
+                # fallback plain text if markdown failed on all channels
+                await router.send_text_to_user(user["id"], text.replace("*", ""))
             save_message(user["id"], "assistant", text)
         except Exception as e:
             print(f"Morning briefing error for user {user['id']}: {e}")
 
 
 async def _morning_briefing_loop(bot):
-    """Sends morning briefing at 09:00 Kemerovo time (02:00 UTC) every day."""
+    """Sends morning briefing at 09:00 Kemerovo time every day."""
     TARGET_HOUR = 9
 
     while True:
@@ -104,7 +117,6 @@ async def _morning_briefing_loop(bot):
         if now >= next_run:
             next_run += timedelta(days=1)
 
-        # asyncio.sleep may wake slightly early; re-sleep instead of firing before target
         while datetime.now(KEMEROVO_TZ) < next_run:
             await asyncio.sleep((next_run - datetime.now(KEMEROVO_TZ)).total_seconds())
 
@@ -115,14 +127,34 @@ async def _morning_briefing_loop(bot):
 
 
 async def _post_init(app):
+    get_router().register(TelegramAdapter(app.bot))
     asyncio.create_task(_reminder_loop(app.bot))
     asyncio.create_task(_morning_briefing_loop(app.bot))
-    await app.bot.set_my_commands([
+
+    if VK_GROUP_TOKEN:
+        asyncio.create_task(_run_vk_safe())
+        print("[vk] Long Poll task scheduled")
+    else:
+        print("[vk] VK_GROUP_TOKEN empty — VK disabled")
+
+    commands = [
         ("start", "Список возможностей"),
         ("status", "Быстрый дашборд — задачи, напоминания"),
         ("connect_calendar", "Подключить Яндекс Календарь"),
         ("clear", "Очистить историю диалога"),
-    ])
+        ("invite", "Админ: выдать доступ TG"),
+        ("invite_vk", "Админ: выдать доступ VK"),
+        ("link_vk", "Админ: связать TG+VK"),
+    ]
+    await app.bot.set_my_commands(commands)
+
+
+async def _run_vk_safe():
+    try:
+        from channels.vk import run_vk_bot
+        await run_vk_bot()
+    except Exception as e:
+        print(f"[vk] Long Poll crashed: {e}")
 
 
 def main() -> None:
@@ -135,6 +167,9 @@ def main() -> None:
     app.add_handler(CommandHandler("clear", handle_clear))
     app.add_handler(CommandHandler("status", handle_status))
     app.add_handler(CommandHandler("connect_calendar", handle_connect_calendar))
+    app.add_handler(CommandHandler("invite", handle_invite))
+    app.add_handler(CommandHandler("invite_vk", handle_invite_vk))
+    app.add_handler(CommandHandler("link_vk", handle_link_vk))
     app.add_handler(MessageHandler(filters.VOICE, handle_voice))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))

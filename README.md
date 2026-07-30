@@ -91,7 +91,7 @@ Supabase            диалог пишется в messages
 ### Прочее
 `web_search` (DuckDuckGo, без ключа) · `save_memory` · `forget_memory` · `list_integrations` · `call_integration` (произвольный n8n webhook)
 
-**Скриншоты:** `browser_navigate` делает скрин для vision модели; `browser_send_screenshot` отправляет PNG пользователю в Telegram.
+**Скриншоты:** `browser_navigate` — скрин для vision модели; `browser_send_screenshot` — PNG в Telegram. Если пользователь просит «скрин», фото уходит автоматически даже после `browser_navigate`.
 
 ### Команды
 
@@ -136,7 +136,8 @@ Supabase            диалог пишется в messages
 
 | Таблица | Что хранит |
 |---------|-----------|
-| `users` | Telegram ID, имя, `is_active`, тариф |
+| `users` | Имя, `is_active`, `plan`, `paid_until`, legacy `telegram_id` |
+| `user_identities` | Каналы: `telegram` / `vk` + external_id |
 | `messages` | История диалога (роль + текст) |
 | `user_memory` | Долгая память: ключ → значение |
 | `tasks` | Задачи: срок, приоритет, статус |
@@ -183,9 +184,12 @@ cd /opt/jarvis && git pull origin main && docker compose up -d --build
 | `BOTHUB_API_KEY` | Ключ BotHub (GPT-4o + Whisper) |
 | `SUPABASE_URL` | URL проекта Supabase |
 | `SUPABASE_SERVICE_KEY` | Service role ключ |
-| `ALLOWED_TELEGRAM_IDS` | Whitelist пользователей, через запятую |
-| `ADMIN_TELEGRAM_IDS` | Администраторы, через запятую |
+| `ALLOWED_TELEGRAM_IDS` | Суперадмин whitelist (через запятую) |
+| `ADMIN_TELEGRAM_IDS` | Админы: `/invite`, `/invite_vk`, `/link_vk` |
+| `ACCESS_CONTACT` | Куда писать при отказе в доступе (напр. `@TimohTG`) |
+| `VK_GROUP_TOKEN` | Опционально: токен сообщества VK |
+| `VK_GROUP_ID` | Опционально: ID сообщества VK |
 | `YANDEX_CALENDAR_CLIENT_ID` | OAuth-приложение Яндекса |
 | `YANDEX_CALENDAR_CLIENT_SECRET` | То же, секрет |
 
-Доступ к боту закрыт whitelist'ом: `ALLOWED_TELEGRAM_IDS`. Кто не в списке — получает отказ.
+Доступ: админ-инвайт (`/invite <telegram_id> [plan] [YYYY-MM-DD]`) или суперадмин из whitelist. Новые без инвайта — отказ.
