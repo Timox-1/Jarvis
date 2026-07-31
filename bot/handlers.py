@@ -5,6 +5,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from openai import AsyncOpenAI
 from tools.memory import (
+    get_user_profile,
     get_or_create_user,
     is_user_allowed,
     save_message,
@@ -20,7 +21,7 @@ from bot.process import process_text
 from channels.base import DeliveryContext
 from channels.router import get_router
 from config import BOTHUB_API_KEY, BOTHUB_BASE_URL, WHISPER_MODEL, ADMIN_TELEGRAM_IDS, ALLOWED_TELEGRAM_IDS
-from bot.admin_notify import notify_access_denied, notify_invite_done
+from bot.admin_notify import notify_access_denied, notify_invite_done, notify_onboarding_started
 
 DOWNLOADS_DIR = Path("downloads")
 DOWNLOADS_DIR.mkdir(exist_ok=True)
@@ -264,7 +265,17 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             bot=context.bot,
         )
         return
+    user_id = get_or_create_user("telegram", user.id, user.full_name)
     await update.message.reply_text(ONBOARDING)
+    profile = get_user_profile(user_id)
+    await notify_onboarding_started(
+        channel="telegram",
+        external_id=user.id,
+        name=user.full_name,
+        username=user.username,
+        plan=(profile or {}).get("plan"),
+        bot=context.bot,
+    )
 
 
 async def handle_clear(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

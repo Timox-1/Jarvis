@@ -12,7 +12,7 @@ from vkbottle.bot import Message
 from channels.base import DeliveryContext
 from channels.vk import VKAdapter
 from bot.process import process_text
-from bot.admin_notify import notify_access_denied
+from bot.admin_notify import notify_access_denied, notify_onboarding_started
 from tools.memory import (
     access_denied_text,
     get_or_create_user,
@@ -68,6 +68,11 @@ async def handle_vk_message(message: Message, adapter: VKAdapter) -> None:
             await _vk_deny(message, peer_id, via="start")
             return
         await message.answer(ONBOARDING)
+        await notify_onboarding_started(
+            channel="vk",
+            external_id=peer_id,
+            name=name,
+        )
         return
 
     if text.startswith("/clear"):

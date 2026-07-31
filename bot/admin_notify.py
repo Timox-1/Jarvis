@@ -117,3 +117,25 @@ async def notify_invite_done(
         bot=bot,
         exclude_telegram_id=by_admin_telegram_id,
     )
+
+
+async def notify_onboarding_started(
+    *,
+    channel: str,
+    external_id: str | int,
+    name: str | None = None,
+    username: str | None = None,
+    plan: str | None = None,
+    bot=None,
+) -> None:
+    """Alert admins that an allowed user opened /start and got onboarding."""
+    uname = f" @{username.lstrip('@')}" if username else ""
+    plan_line = f"\nplan: {plan}" if plan else ""
+    text = (
+        f"👋 Онбординг запущен\n"
+        f"канал: {channel}\n"
+        f"id: {external_id}{uname}\n"
+        f"имя: {name or '—'}{plan_line}"
+    )
+    await notify_admins(text, bot=bot)
+
