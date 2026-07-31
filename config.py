@@ -6,8 +6,8 @@ load_dotenv()
 TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
 BOTHUB_API_KEY = os.environ["BOTHUB_API_KEY"]
 BOTHUB_BASE_URL = "https://bothub.chat/api/v2/openai/v1"
-# Override on VPS via GPT_MODEL=gpt-4o if mini fails tool-use quality.
-GPT_MODEL = os.getenv("GPT_MODEL", "gpt-4o-mini")
+# BotHub: gpt-4o-mini disabled for API (403). Prefer 4.1-mini; rollback GPT_MODEL=gpt-4o.
+GPT_MODEL = os.getenv("GPT_MODEL", "gpt-4.1-mini")
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "assembly-ai-nano")
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
