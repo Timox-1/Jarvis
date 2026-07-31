@@ -5,9 +5,7 @@ Tasks/TODO management for the assistant.
 from datetime import datetime, date, timedelta, timezone
 from db.client import get_db
 from tools.resolve import resolve_row
-
-MOSCOW_TZ = timezone(timedelta(hours=3))
-KEMEROVO_TZ = timezone(timedelta(hours=7))
+from tools.prefs import user_tz, user_now
 
 PRIORITY_ORDER = {"urgent": 4, "high": 3, "normal": 2, "low": 1}
 
@@ -86,7 +84,7 @@ def list_tasks(
         query = query.eq("project_id", project_id)
 
     if date_filter:
-        today = datetime.now(KEMEROVO_TZ).date()
+        today = user_now(user_id).date()
 
         if date_filter == "today":
             query = query.eq("due_date", today.isoformat())
@@ -195,7 +193,7 @@ def update_task(
 def get_today_summary(user_id: str) -> dict:
     """Get summary of today's tasks and upcoming items."""
     db = get_db()
-    today = datetime.now(KEMEROVO_TZ).date()
+    today = user_now(user_id).date()
     tomorrow = today + timedelta(days=1)
 
     # Today's tasks
@@ -228,7 +226,7 @@ def get_today_summary(user_id: str) -> dict:
 
     # Pending reminders for today
     now = datetime.now(timezone.utc)
-    end_of_day = datetime.combine(today, datetime.max.time()).replace(tzinfo=MOSCOW_TZ)
+    end_of_day = datetime.combine(today, datetime.max.time()).replace(tzinfo=user_tz(user_id))
 
     reminders = (db.table("reminders")
                  .select("*")

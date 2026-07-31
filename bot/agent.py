@@ -37,6 +37,7 @@ from tools.projects import (
     resolve_project,
 )
 from system_prompt import get_system_prompt
+from tools.prefs import set_briefing_prefs, format_briefing_prefs, get_user_prefs
 
 client = AsyncOpenAI(api_key=BOTHUB_API_KEY, base_url=BOTHUB_BASE_URL)
 
@@ -133,6 +134,20 @@ async def _execute_tool(tool_name: str, args: dict, user_id: str, delivery=None)
     if tool_name == "get_today_summary":
         result = get_today_summary(user_id)
         return json.dumps(result, ensure_ascii=False)
+
+    # --- Briefing prefs ---
+    if tool_name == "set_briefing_prefs":
+        return set_briefing_prefs(
+            user_id,
+            city=args.get("city"),
+            time=args.get("time"),
+            enabled=args.get("enabled"),
+            utc_offset=args.get("utc_offset"),
+        )
+
+    if tool_name == "get_briefing_prefs":
+        return format_briefing_prefs(user_id)
+
 
     # --- Contacts ---
     if tool_name == "add_contact":
@@ -442,11 +457,13 @@ async def run_agent(user_id: str, user_message: str, history: list[dict], delive
     integrations = list_integrations_for_user(user_id)
     active_project = get_active_project(user_id)
     projects_preview = list_projects_preview(user_id)
+    prefs = get_user_prefs(user_id)
     system_prompt = get_system_prompt(
         memory,
         integrations,
         active_project=active_project,
         projects_preview=projects_preview,
+        prefs=prefs,
     )
 
     messages = [{"role": "system", "content": system_prompt}]

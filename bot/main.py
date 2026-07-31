@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timezone, timedelta, date
+from datetime import datetime, timezone, timedelta
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
 from config import TELEGRAM_TOKEN, VK_GROUP_TOKEN
 from bot.handlers import (
@@ -19,8 +19,6 @@ from tools.reminders import check_and_fire_reminders
 from channels.router import get_router
 from channels.telegram import TelegramAdapter
 
-KEMEROVO_TZ = timezone(timedelta(hours=7))
-
 
 async def _reminder_loop(bot):
     while True:
@@ -31,7 +29,7 @@ async def _reminder_loop(bot):
             print(f"Reminder check error: {e}")
 
 
-BRIEFING_HEADER = "☀️ *Доброе утро! Вот твой день:*"
+BRIEFING_HEADER = "☀️ *Доброе утро! Сводка на день:*"
 
 
 def _briefing_already_sent(db, user_id: str, since_utc: str) -> bool:
@@ -47,30 +45,33 @@ def _briefing_already_sent(db, user_id: str, since_utc: str) -> bool:
     return bool(sent)
 
 
-async def _send_morning_briefings(_bot=None):
+async def _send_morning_briefings(_bot=None, user_ids: list[str] | None = None):
     from db.client import get_db
     from tools.memory import save_message
     from tools.tasks import get_today_summary
     from tools.calendar import list_events
     from channels.router import get_router
+    from tools.prefs import user_now, should_send_briefing_now
 
     db = get_db()
-    users = db.table("users").select("id").eq("is_active", True).execute().data
+    if user_ids is None:
+        users = db.table("users").select("id").eq("is_active", True).execute().data
+        user_ids = [u["id"] for u in users]
     router = get_router()
 
-    today = date.today().isoformat()
-    tomorrow = (date.today() + timedelta(days=1)).isoformat()
-
-    kemerovo_now = datetime.now(KEMEROVO_TZ)
-    day_start_utc = (kemerovo_now.replace(hour=0, minute=0, second=0, microsecond=0)
-                     .astimezone(timezone.utc).isoformat())
-
-    for user in users:
+    for user_id in user_ids:
         try:
-            if _briefing_already_sent(db, user["id"], day_start_utc):
+            if not should_send_briefing_now(user_id):
                 continue
 
-            summary = get_today_summary(user["id"])
+            local = user_now(user_id)
+            day_start_utc = (local.replace(hour=0, minute=0, second=0, microsecond=0)
+                             .astimezone(timezone.utc).isoformat())
+
+            if _briefing_already_sent(db, user_id, day_start_utc):
+                continue
+
+            summary = get_today_summary(user_id)
             lines = [f"{BRIEFING_HEADER}\n"]
 
             if summary["overdue"]:
@@ -89,7 +90,9 @@ async def _send_morning_briefings(_bot=None):
                 lines.append(f"\n⏰ *Напоминания сегодня: {summary['summary']['reminders_count']}*")
 
             try:
-                events = list_events(user["id"], today, tomorrow)
+                today = local.date().isoformat()
+                tomorrow = (local.date() + timedelta(days=1)).isoformat()
+                events = list_events(user_id, today, tomorrow)
                 if events:
                     lines.append(f"\n📅 *Встречи сегодня:*")
                     for e in events[:5]:
@@ -98,33 +101,22 @@ async def _send_morning_briefings(_bot=None):
                 pass
 
             text = "\n".join(lines)
-            sent = await router.send_text_to_user(user["id"], text, parse_mode="Markdown")
+            sent = await router.send_text_to_user(user_id, text, parse_mode="Markdown")
             if not sent:
                 # fallback plain text if markdown failed on all channels
-                await router.send_text_to_user(user["id"], text.replace("*", ""))
-            save_message(user["id"], "assistant", text)
+                await router.send_text_to_user(user_id, text.replace("*", ""))
+            save_message(user_id, "assistant", text)
         except Exception as e:
-            print(f"Morning briefing error for user {user['id']}: {e}")
-
+            print(f"Morning briefing error for user {user_id}: {e}")
 
 async def _morning_briefing_loop(bot):
-    """Sends morning briefing at 09:00 Kemerovo time every day."""
-    TARGET_HOUR = 9
-
+    """Per-user morning briefing: check every 60s against each user's local prefs."""
     while True:
-        now = datetime.now(KEMEROVO_TZ)
-        next_run = now.replace(hour=TARGET_HOUR, minute=0, second=0, microsecond=0)
-        if now >= next_run:
-            next_run += timedelta(days=1)
-
-        while datetime.now(KEMEROVO_TZ) < next_run:
-            await asyncio.sleep((next_run - datetime.now(KEMEROVO_TZ)).total_seconds())
-
+        await asyncio.sleep(60)
         try:
             await _send_morning_briefings(bot)
         except Exception as e:
             print(f"Morning briefing loop error: {e}")
-
 
 async def _post_init(app):
     get_router().register(TelegramAdapter(app.bot))

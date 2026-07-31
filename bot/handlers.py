@@ -30,14 +30,15 @@ ONBOARDING = (
     "Привет! Я Джарвис — личный ИИ-ассистент.\n\n"
     "Умею:\n"
     "• проекты — скажи «создай проект/объект/дело …», кидай инфу, разложу по задачам и тратам\n"
-    "• задачи, напоминания, утренний брифинг в 09:00\n"
+    "• задачи, напоминания, утренняя сводка на день\n"
     "• Яндекс Календарь — /connect_calendar\n"
     "• почту, контакты, заметки, учёт расходов\n"
     "• голос, фото, PDF, браузер\n\n"
     "Просто напиши обычным языком. Голосовые тоже ок.\n\n"
     "/status — сводка дня\n"
     "/connect_calendar — Яндекс Календарь\n"
-    "/clear — очистить историю"
+    "/clear — очистить историю\n\n"
+    "Напиши город — поставлю правильное время для напоминаний и утренней сводки."
 )
 
 def _delivery(update: Update) -> DeliveryContext:
@@ -304,6 +305,7 @@ async def handle_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     from tools.tasks import get_today_summary
     from tools.reminders import list_reminders
     from tools.memory import get_user_profile
+    from tools.prefs import format_briefing_prefs
     from db.client import get_db
 
     summary = get_today_summary(user_id)
@@ -332,6 +334,8 @@ async def handle_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     lines.append(f"⏰ Активных напоминаний: *{len(reminders)}*")
     cal_status = "подключён ✅" if cal_connected else "не подключён — /connect\\_calendar"
     lines.append(f"📆 Яндекс Календарь: {cal_status}")
+    lines.append("")
+    lines.append(format_briefing_prefs(user_id))
     if profile:
         plan = profile.get("plan") or "—"
         paid = profile.get("paid_until") or "—"

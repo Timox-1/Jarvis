@@ -1,13 +1,12 @@
 from datetime import datetime, timezone, timedelta
 
-KEMEROVO_TZ = timezone(timedelta(hours=7))
-
 
 def get_system_prompt(
     user_memory: dict,
     integrations: list = None,
     active_project: dict = None,
     projects_preview: list = None,
+    prefs: dict = None,
 ) -> str:
     memory_text = ""
     if user_memory:
@@ -16,9 +15,23 @@ def get_system_prompt(
     else:
         memory_text = "О пользователе пока ничего не известно."
 
-    now = datetime.now(KEMEROVO_TZ)
-    now_str = now.strftime("%A, %d %B %Y, %H:%M (Kemerovo, UTC+7)")
+    prefs = prefs or {}
+    try:
+        offset = int(prefs.get("tz_offset_hours", 7))
+    except (TypeError, ValueError):
+        offset = 7
+    city = prefs.get("city") or "Кемерово"
+    briefing_time = prefs.get("briefing_time") or "09:00"
+    briefing_enabled = prefs.get("briefing_enabled", True)
+    user_tzinfo = timezone(timedelta(hours=offset))
+    now = datetime.now(user_tzinfo)
+    sign = "+" if offset >= 0 else "-"
+    abs_off = abs(offset)
+    offset_label = f"UTC{sign}{abs_off}"
+    iso_offset = f"{sign}{abs_off:02d}:00"
+    now_str = now.strftime(f"%A, %d %B %Y, %H:%M ({city}, {offset_label})")
     today_str = now.strftime("%Y-%m-%d")
+    briefing_status = "включён" if briefing_enabled else "выключен"
 
     if integrations:
         integration_lines = [f"- {i['type']}: {i.get('config', {}).get('description', '')}" for i in integrations]
@@ -44,6 +57,8 @@ def get_system_prompt(
 
 Сейчас: {now_str}
 Сегодня: {today_str}
+Город / часовой пояс: {city} ({offset_label})
+Утренняя сводка: {briefing_time} ({briefing_status})
 
 {memory_text}
 
@@ -86,8 +101,15 @@ def get_system_prompt(
 - get_today_summary — "что у меня сегодня" (задачи + напоминания + просроченное)
 
 ### Напоминания
-- set_reminder — напомнить в конкретное время (используй fire_at в ISO 8601 с +07:00)
+- set_reminder — напомнить в конкретное время (используй fire_at в ISO 8601 с {iso_offset})
 - list_reminders, delete_reminder — управление напоминаниями
+
+
+### Город и утренняя сводка
+- set_briefing_prefs — задать город/таймзону и/или время утренней сводки (city, time HH:MM, enabled, utc_offset). Для пользователя говори «сводка»; «брифинг» — синоним
+- get_briefing_prefs — показать текущий город, офсет и время сводки
+- Если пользователь назвал город или время сводки (или сказал «брифинг») — сразу вызови set_briefing_prefs
+- Если город неизвестен — спроси utc_offset (например UTC+3) или более крупный город рядом
 
 ### Контакты и заметки
 - add_contact — добавить контакт (имя, телефон, email, telegram_id, компания, теги; опционально project)
@@ -104,7 +126,7 @@ def get_system_prompt(
 
 ### Яндекс Календарь
 - list_events — события за период (start_date, end_date в формате YYYY-MM-DD)
-- create_event — создать встречу (title, start/end в ISO с +07:00, длительность по умолчанию 1 час)
+- create_event — создать встречу (title, start/end в ISO с {iso_offset}, длительность по умолчанию 1 час)
 - delete_event — удалить событие по uid (сначала найди через list_events)
 - Если календарь не подключён — предложи /connect_calendar
 
@@ -138,10 +160,11 @@ def get_system_prompt(
 2. **Будь проактивным** — если пользователь говорит "запиши", "напомни", "добавь" — сразу делай
 3. **Для задач используй add_task**, для напоминалок по времени — set_reminder
 4. **"Что на сегодня"** = get_today_summary
-4.1. **Сказано "сделано" — СДЕЛАЙ ЭТО В БАЗЕ, а не на словах.** Если пользователь говорит "сделано", "уже выполнил", "закрыл", "просроченные выполнены", "отмени напоминание" — обязательно вызови соответствующий тул (complete_task, delete_reminder). Никогда не отвечай "рад, что всё выполнено" / "напоминание отменил" без вызова тула: в базе ничего не изменится, и задача будет каждое утро приходить в утреннем брифинге. Если сказано "все просроченные выполнены" — вызови list_tasks и закрой каждую по очереди.
+4.1. **Сказано "сделано" — СДЕЛАЙ ЭТО В БАЗЕ, а не на словах.** Если пользователь говорит "сделано", "уже выполнил", "закрыл", "просроченные выполнены", "отмени напоминание" — обязательно вызови соответствующий тул (complete_task, delete_reminder). Никогда не отвечай "рад, что всё выполнено" / "напоминание отменил" без вызова тула: в базе ничего не изменится, и задача будет каждое утро приходить в утренней сводке. Если сказано "все просроченные выполнены" — вызови list_tasks и закрой каждую по очереди.
 4.2. **ID знать не нужно.** complete_task, delete_task, update_task, delete_reminder, add_contact_note, delete_event, set_active_project, archive_project принимают не только UUID, но и название/имя. Передавай название напрямую. Если тул ответил, что подходит несколько — покажи варианты пользователю и спроси, какой именно.
+4.3. **Город или время сводки** — если пользователь назвал город («я в Москве», «Владивосток», ответ на онбординг) — вызови set_briefing_prefs(city=…). Время сводки по умолчанию 09:00; меняй только если сам просит («сводку в 8:00»; «брифинг» — синоним). Если город неизвестен — спроси utc_offset или более крупный город рядом.
 5. **Краткость** — не пиши лишнего, давай суть
-6. **Даты** — для due_date используй {today_str} как сегодня, для fire_at и calendar — полный ISO с +07:00
+6. **Даты** — для due_date используй {today_str} как сегодня, для fire_at и calendar — полный ISO с {iso_offset}
 7. **Контакты** — если пользователь упоминает человека с деталями, предложи сохранить
 8. **Ошибки** — объясни что пошло не так и что делать
 9. **Скриншоты в Telegram** — browser_navigate делает скрин только для тебя. Чтобы пользователь увидел картинку в чате — вызови browser_send_screenshot. Никогда не говори «отправил скрин», если не вызывал browser_send_screenshot.
@@ -156,9 +179,10 @@ def get_system_prompt(
   add_task(title="Приёмка арматуры", due_date=завтра) +
   add_project_note(text=исходная фраза)
 "Что по проекту?" → get_project_summary
-"Напомни завтра в 10 позвонить Иванову" → set_reminder с fire_at завтра 10:00 Kemerovo
+"Я в Москве, сводку в 8:00" → set_briefing_prefs(city="Москва", time="08:00")
+"Напомни завтра в 10 позвонить Иванову" → set_reminder с fire_at завтра 10:00 ({offset_label})
 "Запиши задачу: подготовить отчёт до пятницы" → add_task с due_date пятницы
 "Что у меня сегодня?" → get_today_summary
 "Добавь контакт: Петров Иван, Рога и Копыта, +7900..." → add_contact
 "Что у меня в календаре на этой неделе?" → list_events(start_date=сегодня, end_date=+7 дней)
-"Запиши встречу с командой в пятницу в 14:00" → create_event(title="Встреча с командой", start="...T14:00:00+07:00", end="...T15:00:00+07:00")"""
+"Запиши встречу с командой в пятницу в 14:00" → create_event(title="Встреча с командой", start="...T14:00:00{iso_offset}", end="...T15:00:00{iso_offset}")"""

@@ -848,4 +848,47 @@ TOOLS = [
             },
         },
     },
+
+    {
+        "type": "function",
+        "function": {
+            "name": "set_briefing_prefs",
+            "description": "Set user's city/timezone and/or morning summary time (утренняя сводка). Use when user says their city, asks to change summary/сводка time (or says брифинг as synonym), or answers onboarding about city/time. Examples: city=Москва time=08:00; time=7:30; city=Владивосток.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "city": {
+                        "type": "string",
+                        "description": "City name (used to resolve timezone offset)",
+                    },
+                    "time": {
+                        "type": "string",
+                        "description": "Morning summary (сводка) time HH:MM local; user may say брифинг",
+                    },
+                    "enabled": {
+                        "type": "boolean",
+                        "description": "Enable or disable morning summary (утренняя сводка; брифинг = synonym)",
+                    },
+                    "utc_offset": {
+                        "type": "integer",
+                        "description": "UTC offset in hours if city is unknown",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_briefing_prefs",
+            "description": "Show current city, timezone offset and morning summary (сводка) time.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        },
+    },
+
 ]
