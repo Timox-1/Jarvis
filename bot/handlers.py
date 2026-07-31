@@ -27,6 +27,7 @@ DOWNLOADS_DIR.mkdir(exist_ok=True)
 ONBOARDING = (
     "Привет! Я Джарвис — личный ИИ-ассистент.\n\n"
     "Умею:\n"
+    "• проекты — скажи «создай проект/объект/дело …», кидай инфу, разложу по задачам и тратам\n"
     "• задачи, напоминания, утренний брифинг в 09:00\n"
     "• Яндекс Календарь — /connect_calendar\n"
     "• почту, контакты, заметки, учёт расходов\n"
@@ -36,7 +37,6 @@ ONBOARDING = (
     "/connect_calendar — Яндекс Календарь\n"
     "/clear — очистить историю"
 )
-
 
 def _delivery(update: Update) -> DeliveryContext:
     return DeliveryContext(channel="telegram", external_id=str(update.effective_user.id))
