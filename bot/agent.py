@@ -22,6 +22,20 @@ from tools.expenses import add_expense, list_expenses, get_expense_summary
 from tools.income import add_income, list_income, get_financial_summary
 from tools.contact_notes import add_contact_note, list_contact_notes
 from tools.email import list_emails, read_email, send_email
+from tools.projects import (
+    create_project,
+    list_projects,
+    set_active_project,
+    clear_active_project,
+    archive_project,
+    rename_project,
+    add_project_note,
+    list_project_notes,
+    get_project_summary,
+    get_active_project,
+    list_projects_preview,
+    resolve_project,
+)
 from system_prompt import get_system_prompt
 
 client = AsyncOpenAI(api_key=BOTHUB_API_KEY, base_url=BOTHUB_BASE_URL)
@@ -34,6 +48,18 @@ def _user_wants_screenshot(text: str) -> bool:
     return any(k in t for k in ("скрин", "screenshot", "screen shot", "скриншот"))
 
 
+def _resolve_project_id(user_id: str, args: dict, *, required: bool = False) -> tuple[str | None, str | None]:
+    """Resolve optional/required project ref → id. Uses active project when ref omitted."""
+    ref = args.get("project")
+    if not ref and not required:
+        active = get_active_project(user_id)
+        return (active["id"] if active else None), None
+    proj, error = resolve_project(user_id, ref, allow_active=True)
+    if error:
+        return None, error
+    return proj["id"], None
+
+
 async def _execute_tool(tool_name: str, args: dict, user_id: str, delivery=None) -> str:
     # --- Memory ---
     if tool_name == "save_memory":
@@ -44,7 +70,10 @@ async def _execute_tool(tool_name: str, args: dict, user_id: str, delivery=None)
 
     # --- Reminders ---
     if tool_name == "set_reminder":
-        return set_reminder(user_id, args["text"], args["fire_at"])
+        project_id, err = _resolve_project_id(user_id, args)
+        if err and args.get("project"):
+            return err
+        return set_reminder(user_id, args["text"], args["fire_at"], project_id=project_id)
 
     if tool_name == "list_reminders":
         result = list_reminders(user_id)
@@ -55,21 +84,31 @@ async def _execute_tool(tool_name: str, args: dict, user_id: str, delivery=None)
 
     # --- Tasks ---
     if tool_name == "add_task":
+        project_id, err = _resolve_project_id(user_id, args)
+        if err and args.get("project"):
+            return err
         return add_task(
             user_id,
             args["title"],
             description=args.get("description"),
             due_date=args.get("due_date"),
             due_time=args.get("due_time"),
-            priority=args.get("priority", "normal")
+            priority=args.get("priority", "normal"),
+            project_id=project_id,
         )
 
     if tool_name == "list_tasks":
+        project_id = None
+        if args.get("project"):
+            project_id, err = _resolve_project_id(user_id, args)
+            if err:
+                return err
         result = list_tasks(
             user_id,
             status=args.get("status"),
             date_filter=args.get("date_filter"),
-            include_completed=args.get("include_completed", False)
+            include_completed=args.get("include_completed", False),
+            project_id=project_id,
         )
         return json.dumps(result, ensure_ascii=False) if result else "[]"
 
@@ -97,16 +136,21 @@ async def _execute_tool(tool_name: str, args: dict, user_id: str, delivery=None)
 
     # --- Contacts ---
     if tool_name == "add_contact":
+        project_id, err = _resolve_project_id(user_id, args)
+        if err and args.get("project"):
+            return err
         return add_contact(
             user_id,
             args["name"],
             phone=args.get("phone"),
             email=args.get("email"),
             telegram_username=args.get("telegram_username"),
+            telegram_id=args.get("telegram_id"),
             company=args.get("company"),
             role=args.get("role"),
             notes=args.get("notes"),
-            tags=args.get("tags")
+            tags=args.get("tags"),
+            project_id=project_id,
         )
 
     if tool_name == "list_contacts":
@@ -226,20 +270,92 @@ async def _execute_tool(tool_name: str, args: dict, user_id: str, delivery=None)
 
     # --- Expenses ---
     if tool_name == "add_expense":
+        project_id, err = _resolve_project_id(user_id, args)
+        if err and args.get("project"):
+            return err
         return add_expense(
             user_id,
             args["amount"],
             category=args.get("category", "прочее"),
             description=args.get("description"),
             expense_date=args.get("expense_date"),
+            project_id=project_id,
         )
 
     if tool_name == "list_expenses":
-        result = list_expenses(user_id, period=args.get("period", "week"), category=args.get("category"))
+        project_id = None
+        if args.get("project"):
+            project_id, err = _resolve_project_id(user_id, args)
+            if err:
+                return err
+        result = list_expenses(
+            user_id,
+            period=args.get("period", "week"),
+            category=args.get("category"),
+            project_id=project_id,
+        )
         return json.dumps(result, ensure_ascii=False) if result else "[]"
 
     if tool_name == "get_expense_summary":
-        result = get_expense_summary(user_id, period=args.get("period", "month"))
+        project_id = None
+        if args.get("project"):
+            project_id, err = _resolve_project_id(user_id, args)
+            if err:
+                return err
+        result = get_expense_summary(
+            user_id,
+            period=args.get("period", "month"),
+            project_id=project_id,
+        )
+        return json.dumps(result, ensure_ascii=False)
+
+    # --- Projects ---
+    if tool_name == "create_project":
+        return create_project(
+            user_id,
+            args["name"],
+            description=args.get("description"),
+            set_active=args.get("set_active", True),
+        )
+
+    if tool_name == "list_projects":
+        result = list_projects(user_id, status=args.get("status", "active"))
+        return json.dumps(result, ensure_ascii=False) if result else "[]"
+
+    if tool_name == "set_active_project":
+        return set_active_project(user_id, args["project"])
+
+    if tool_name == "clear_active_project":
+        return clear_active_project(user_id)
+
+    if tool_name == "archive_project":
+        return archive_project(user_id, args.get("project"))
+
+    if tool_name == "rename_project":
+        return rename_project(user_id, args["project"], args["new_name"])
+
+    if tool_name == "add_project_note":
+        return add_project_note(
+            user_id,
+            args["text"],
+            project=args.get("project"),
+            source="user_dump",
+        )
+
+    if tool_name == "list_project_notes":
+        result = list_project_notes(
+            user_id,
+            project=args.get("project"),
+            limit=args.get("limit", 20),
+        )
+        if isinstance(result, str):
+            return result
+        return json.dumps(result, ensure_ascii=False) if result else "[]"
+
+    if tool_name == "get_project_summary":
+        result = get_project_summary(user_id, project=args.get("project"))
+        if isinstance(result, str):
+            return result
         return json.dumps(result, ensure_ascii=False)
 
     # --- Browser ---
@@ -324,7 +440,14 @@ def _make_vision_message(role: str, content: str, screenshot_b64: str | None = N
 async def run_agent(user_id: str, user_message: str, history: list[dict], delivery=None) -> str:
     memory = read_memory(user_id)
     integrations = list_integrations_for_user(user_id)
-    system_prompt = get_system_prompt(memory, integrations)
+    active_project = get_active_project(user_id)
+    projects_preview = list_projects_preview(user_id)
+    system_prompt = get_system_prompt(
+        memory,
+        integrations,
+        active_project=active_project,
+        projects_preview=projects_preview,
+    )
 
     messages = [{"role": "system", "content": system_prompt}]
     messages.extend(history)

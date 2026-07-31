@@ -3,15 +3,19 @@ from db.client import get_db
 from tools.resolve import resolve_row
 
 
-def set_reminder(user_id: str, text: str, fire_at: str) -> str:
+def set_reminder(user_id: str, text: str, fire_at: str, project_id: str = None) -> str:
     db = get_db()
-    db.table("reminders").insert({
+    row = {
         "user_id": user_id,
         "text": text,
         "fire_at": fire_at,
         "done": False,
-    }).execute()
-    return f"Напоминание установлено: {text}"
+    }
+    if project_id:
+        row["project_id"] = project_id
+    db.table("reminders").insert(row).execute()
+    suffix = " [проект]" if project_id else ""
+    return f"Напоминание установлено: {text}{suffix}"
 
 
 def list_reminders(user_id: str) -> list[dict]:

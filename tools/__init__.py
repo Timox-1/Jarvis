@@ -71,6 +71,10 @@ TOOLS = [
                         "description": "Priority level (default: normal)"
                     },
                     "description": {"type": "string", "description": "Detailed description (optional)"},
+                    "project": {
+                        "type": "string",
+                        "description": "Project name or UUID. If omitted and user has an active project, it is attached automatically.",
+                    },
                 },
                 "required": ["title"],
             },
@@ -94,6 +98,10 @@ TOOLS = [
                         "description": "Filter by status"
                     },
                     "include_completed": {"type": "boolean", "description": "Include completed tasks (default: false)"},
+                    "project": {
+                        "type": "string",
+                        "description": "Filter by project name or UUID (optional)",
+                    },
                 },
                 "required": [],
             },
@@ -190,6 +198,10 @@ TOOLS = [
                         "items": {"type": "string"},
                         "description": "Tags for grouping, e.g. ['client', 'vip']"
                     },
+                    "project": {
+                        "type": "string",
+                        "description": "Project name or UUID to link this contact to. Active project used if omitted.",
+                    },
                 },
                 "required": ["name"],
             },
@@ -266,6 +278,10 @@ TOOLS = [
                     "fire_at": {
                         "type": "string",
                         "description": "ISO 8601 datetime with timezone when to fire, e.g. '2026-05-19T15:00:00+03:00' for MSK",
+                    },
+                    "project": {
+                        "type": "string",
+                        "description": "Project name or UUID. Active project used if omitted.",
                     },
                 },
                 "required": ["text", "fire_at"],
@@ -644,6 +660,10 @@ TOOLS = [
                     },
                     "description": {"type": "string", "description": "На что потрачено"},
                     "expense_date": {"type": "string", "description": "Дата YYYY-MM-DD, по умолчанию сегодня"},
+                    "project": {
+                        "type": "string",
+                        "description": "Project name or UUID. Active project used if omitted.",
+                    },
                 },
                 "required": ["amount"],
             },
@@ -663,6 +683,10 @@ TOOLS = [
                         "description": "Период"
                     },
                     "category": {"type": "string", "description": "Фильтр по категории"},
+                    "project": {
+                        "type": "string",
+                        "description": "Filter by project name or UUID",
+                    },
                 },
                 "required": [],
             },
@@ -681,6 +705,144 @@ TOOLS = [
                         "enum": ["today", "week", "month"],
                         "description": "Период"
                     },
+                    "project": {
+                        "type": "string",
+                        "description": "Filter by project name or UUID",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+
+    # --- Projects (dump & sort) ---
+    {
+        "type": "function",
+        "function": {
+            "name": "create_project",
+            "description": "Create a project/container for dumping info (construction object, deal, client work, etc). Usually set_active=true so further dumps go there.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Project name"},
+                    "description": {"type": "string", "description": "Optional short description"},
+                    "set_active": {
+                        "type": "boolean",
+                        "description": "Make it the active project (default true)",
+                    },
+                },
+                "required": ["name"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_projects",
+            "description": "List user's projects.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "enum": ["active", "archived", "all"],
+                        "description": "Filter (default active)",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "set_active_project",
+            "description": "Set the active project context. Use when user says they will dump info into a project.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "project": {"type": "string", "description": "Project name or UUID"},
+                },
+                "required": ["project"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "clear_active_project",
+            "description": "Clear active project context.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "archive_project",
+            "description": "Archive/close a project. Use for 'закрой проект', 'в архив'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "project": {"type": "string", "description": "Project name or UUID (default: active)"},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "rename_project",
+            "description": "Rename a project.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "project": {"type": "string", "description": "Current project name or UUID"},
+                    "new_name": {"type": "string", "description": "New name"},
+                },
+                "required": ["project", "new_name"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_project_note",
+            "description": "Save a raw note/dump into the project log. ALWAYS call this when user dumps project info, even if you also created tasks/expenses/contacts — so nothing is lost.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string", "description": "Raw text to store"},
+                    "project": {"type": "string", "description": "Project name or UUID (default: active)"},
+                },
+                "required": ["text"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_project_notes",
+            "description": "List recent raw notes for a project.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "project": {"type": "string", "description": "Project name or UUID (default: active)"},
+                    "limit": {"type": "integer", "description": "Max notes (default 20)"},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_project_summary",
+            "description": "Full project snapshot: open tasks, expenses total, contacts, reminders, recent notes. Use for 'что по проекту', 'сводка по проекту'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "project": {"type": "string", "description": "Project name or UUID (default: active)"},
                 },
                 "required": [],
             },

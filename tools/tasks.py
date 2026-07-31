@@ -18,7 +18,8 @@ def add_task(
     description: str = None,
     due_date: str = None,
     due_time: str = None,
-    priority: str = "normal"
+    priority: str = "normal",
+    project_id: str = None,
 ) -> str:
     """Add a new task to the user's TODO list."""
     db = get_db()
@@ -36,6 +37,8 @@ def add_task(
         data["due_date"] = due_date
     if due_time:
         data["due_time"] = due_time
+    if project_id:
+        data["project_id"] = project_id
 
     db.table("tasks").insert(data).execute()
 
@@ -47,6 +50,8 @@ def add_task(
         result += ")"
     if priority != "normal":
         result += f" [{priority}]"
+    if project_id:
+        result += " [проект]"
 
     return result
 
@@ -55,7 +60,8 @@ def list_tasks(
     user_id: str,
     status: str = None,
     date_filter: str = None,
-    include_completed: bool = False
+    include_completed: bool = False,
+    project_id: str = None,
 ) -> list[dict]:
     """
     List user's tasks.
@@ -65,6 +71,7 @@ def list_tasks(
         status: Filter by status (pending, in_progress, done)
         date_filter: 'today', 'tomorrow', 'week', or specific date YYYY-MM-DD
         include_completed: Include completed tasks
+        project_id: Filter by project
     """
     db = get_db()
 
@@ -74,6 +81,9 @@ def list_tasks(
         query = query.eq("status", status)
     elif not include_completed:
         query = query.in_("status", ["pending", "in_progress"])
+
+    if project_id:
+        query = query.eq("project_id", project_id)
 
     if date_filter:
         today = datetime.now(KEMEROVO_TZ).date()

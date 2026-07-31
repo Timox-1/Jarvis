@@ -15,7 +15,8 @@ def add_contact(
     company: str = None,
     role: str = None,
     notes: str = None,
-    tags: list[str] = None
+    tags: list[str] = None,
+    project_id: str = None,
 ) -> str:
     """Add a new contact to the address book."""
     db = get_db()
@@ -42,11 +43,18 @@ def add_contact(
     if tags:
         data["tags"] = tags
 
-    db.table("contacts").insert(data).execute()
+    inserted = db.table("contacts").insert(data).execute()
+    contact_id = inserted.data[0]["id"] if inserted.data else None
+
+    if project_id and contact_id:
+        from tools.projects import link_contact_to_project
+        link_contact_to_project(user_id, contact_id, project_id)
 
     result = f"Контакт добавлен: {name}"
     if company:
         result += f" ({company})"
+    if project_id:
+        result += " [проект]"
 
     return result
 
