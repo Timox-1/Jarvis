@@ -20,6 +20,7 @@ from bot.process import process_text
 from channels.base import DeliveryContext
 from channels.router import get_router
 from config import BOTHUB_API_KEY, BOTHUB_BASE_URL, WHISPER_MODEL, ADMIN_TELEGRAM_IDS, ALLOWED_TELEGRAM_IDS
+from bot.admin_notify import notify_access_denied, notify_invite_done
 
 DOWNLOADS_DIR = Path("downloads")
 DOWNLOADS_DIR.mkdir(exist_ok=True)
@@ -54,18 +55,27 @@ async def _safe_reply(message, text: str) -> None:
         await message.reply_text(text)
 
 
-async def _deny_if_needed(update: Update) -> bool:
+async def _deny_if_needed(update: Update, context: ContextTypes.DEFAULT_TYPE | None = None) -> bool:
     """Return True if access denied (and reply sent). Still registers inactive user on /start path."""
     user = update.effective_user
     if is_user_allowed("telegram", user.id):
         return False
     await update.message.reply_text(access_denied_text())
+    bot = context.bot if context is not None else None
+    await notify_access_denied(
+        channel="telegram",
+        external_id=user.id,
+        name=user.full_name,
+        username=user.username,
+        via="message",
+        bot=bot,
+    )
     return True
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    if await _deny_if_needed(update):
+    if await _deny_if_needed(update, context):
         return
 
     user_id = get_or_create_user("telegram", user.id, user.full_name)
@@ -76,7 +86,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    if await _deny_if_needed(update):
+    if await _deny_if_needed(update, context):
         return
 
     user_id = get_or_create_user("telegram", user.id, user.full_name)
@@ -107,7 +117,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    if await _deny_if_needed(update):
+    if await _deny_if_needed(update, context):
         return
 
     user_id = get_or_create_user("telegram", user.id, user.full_name)
@@ -206,7 +216,7 @@ async def _transcribe_audio(mp3_path: Path) -> str:
 
 async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    if await _deny_if_needed(update):
+    if await _deny_if_needed(update, context):
         return
 
     user_id = get_or_create_user("telegram", user.id, user.full_name)
@@ -245,13 +255,21 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     get_or_create_user("telegram", user.id, user.full_name)
     if not is_user_allowed("telegram", user.id):
         await update.message.reply_text(access_denied_text())
+        await notify_access_denied(
+            channel="telegram",
+            external_id=user.id,
+            name=user.full_name,
+            username=user.username,
+            via="start",
+            bot=context.bot,
+        )
         return
     await update.message.reply_text(ONBOARDING)
 
 
 async def handle_clear(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    if await _deny_if_needed(update):
+    if await _deny_if_needed(update, context):
         return
 
     user_id = get_or_create_user("telegram", user.id, user.full_name)
@@ -267,7 +285,7 @@ async def handle_clear(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def handle_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    if await _deny_if_needed(update):
+    if await _deny_if_needed(update, context):
         return
 
     user_id = get_or_create_user("telegram", user.id, user.full_name)
@@ -313,7 +331,7 @@ async def handle_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 async def handle_connect_calendar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    if await _deny_if_needed(update):
+    if await _deny_if_needed(update, context):
         return
 
     from config import YANDEX_CALENDAR_CLIENT_ID
@@ -379,6 +397,17 @@ async def handle_invite(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         f"paid_until: {result['paid_until'] or '—'}\n"
         f"user_id: {result['user_id']}"
     )
+    await notify_invite_done(
+        channel="telegram",
+        external_id=result["external_id"],
+        plan=result["plan"],
+        paid_until=result.get("paid_until"),
+        created=result["created"],
+        user_id=result["user_id"],
+        by_admin_telegram_id=user.id,
+        bot=context.bot,
+    )
+
 
 
 async def handle_invite_vk(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -423,6 +452,17 @@ async def handle_invite_vk(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         f"paid_until: {result['paid_until'] or '—'}\n"
         f"user_id: {result['user_id']}"
     )
+    await notify_invite_done(
+        channel="vk",
+        external_id=result["external_id"],
+        plan=result["plan"],
+        paid_until=result.get("paid_until"),
+        created=result["created"],
+        user_id=result["user_id"],
+        by_admin_telegram_id=user.id,
+        bot=context.bot,
+    )
+
 
 
 async def handle_link_vk(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

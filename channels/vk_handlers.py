@@ -12,6 +12,7 @@ from vkbottle.bot import Message
 from channels.base import DeliveryContext
 from channels.vk import VKAdapter
 from bot.process import process_text
+from bot.admin_notify import notify_access_denied
 from tools.memory import (
     access_denied_text,
     get_or_create_user,
@@ -19,6 +20,12 @@ from tools.memory import (
     save_message,
     clear_history,
 )
+
+
+async def _vk_deny(message, peer_id: int, *, via: str = "message") -> None:
+    await message.answer(access_denied_text())
+    await notify_access_denied(channel="vk", external_id=peer_id, via=via)
+
 
 DOWNLOADS_DIR = Path("downloads")
 DOWNLOADS_DIR.mkdir(exist_ok=True)
@@ -58,14 +65,14 @@ async def handle_vk_message(message: Message, adapter: VKAdapter) -> None:
     if text.startswith("/start") or text.lower() in ("начать", "start"):
         user_id = get_or_create_user("vk", peer_id, name)
         if not is_user_allowed("vk", peer_id):
-            await message.answer(access_denied_text())
+            await _vk_deny(message, peer_id, via="start")
             return
         await message.answer(ONBOARDING)
         return
 
     if text.startswith("/clear"):
         if not is_user_allowed("vk", peer_id):
-            await message.answer(access_denied_text())
+            await _vk_deny(message, peer_id)
             return
         user_id = get_or_create_user("vk", peer_id, name)
         count = clear_history(user_id)
@@ -74,7 +81,7 @@ async def handle_vk_message(message: Message, adapter: VKAdapter) -> None:
 
     if text.startswith("/status"):
         if not is_user_allowed("vk", peer_id):
-            await message.answer(access_denied_text())
+            await _vk_deny(message, peer_id)
             return
         user_id = get_or_create_user("vk", peer_id, name)
         from tools.tasks import get_today_summary
