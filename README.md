@@ -96,7 +96,7 @@ Supabase            диалог пишется в messages
 ### Утренний брифинг (prefs)
 `set_briefing_prefs` · `get_briefing_prefs`
 
-Время сводки и таймзона на пользователя (не только «09:00 Кемерово на всех»).
+Время сводки и таймзона на пользователя (не только «09:00 Кемерово на всех»). Если бот проснулся позже часа сводки — догонит, пока за этот день ещё не слали.
 
 ### Прочее
 `web_search` (DuckDuckGo, без ключа) · `save_memory` · `forget_memory` · `list_integrations` · `call_integration` (произвольный n8n webhook)

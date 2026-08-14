@@ -103,20 +103,22 @@ async def _send_morning_briefings(_bot=None, user_ids: list[str] | None = None):
             text = "\n".join(lines)
             sent = await router.send_text_to_user(user_id, text, parse_mode="Markdown")
             if not sent:
-                # fallback plain text if markdown failed on all channels
-                await router.send_text_to_user(user_id, text.replace("*", ""))
-            save_message(user_id, "assistant", text)
+                sent = await router.send_text_to_user(user_id, text.replace("*", ""))
+            if sent:
+                save_message(user_id, "assistant", text)
+            else:
+                print(f"Morning briefing not delivered for user {user_id}")
         except Exception as e:
             print(f"Morning briefing error for user {user_id}: {e}")
 
 async def _morning_briefing_loop(bot):
-    """Per-user morning briefing: check every 60s against each user's local prefs."""
+    """Per-user morning briefing: catch-up on start, then check every 60s."""
     while True:
-        await asyncio.sleep(60)
         try:
             await _send_morning_briefings(bot)
         except Exception as e:
             print(f"Morning briefing loop error: {e}")
+        await asyncio.sleep(60)
 
 async def _post_init(app):
     get_router().register(TelegramAdapter(app.bot))

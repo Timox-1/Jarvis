@@ -278,12 +278,25 @@ def format_briefing_prefs(user_id: str) -> str:
     )
 
 
-def should_send_briefing_now(user_id: str, *, window_minutes: int = 1) -> bool:
-    p = get_user_prefs(user_id)
-    if not p["briefing_enabled"]:
+def briefing_due(now: datetime, briefing_time: str, *, enabled: bool = True) -> bool:
+    """True if local time is at or after today's briefing hour.
+
+    Catch-up after a late tick or container restart. Duplicate sends are
+    blocked by `_briefing_already_sent`, not by a 1-minute window.
+    """
+    if not enabled:
         return False
-    now = user_now(user_id)
-    hh, mm = map(int, p["briefing_time"].split(":"))
-    target_min = hh * 60 + mm
-    now_min = now.hour * 60 + now.minute
-    return target_min <= now_min < target_min + window_minutes
+    parsed, err = parse_briefing_time(str(briefing_time))
+    if err or not parsed:
+        return False
+    hh, mm = map(int, parsed.split(":"))
+    return now.hour * 60 + now.minute >= hh * 60 + mm
+
+
+def should_send_briefing_now(user_id: str) -> bool:
+    p = get_user_prefs(user_id)
+    return briefing_due(
+        user_now(user_id),
+        p["briefing_time"],
+        enabled=p["briefing_enabled"],
+    )
