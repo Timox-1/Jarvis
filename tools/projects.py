@@ -179,6 +179,20 @@ def archive_project(user_id: str, project: str | None = None) -> str:
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }).eq("id", proj["id"]).execute()
 
+    now_iso = datetime.now(timezone.utc).isoformat()
+    open_tasks = (
+        db.table("tasks")
+        .select("id")
+        .eq("project_id", proj["id"])
+        .in_("status", ["pending", "in_progress"])
+        .execute()
+    ).data or []
+    for task in open_tasks:
+        db.table("tasks").update({
+            "status": "done",
+            "completed_at": now_iso,
+        }).eq("id", task["id"]).execute()
+
     user = (
         db.table("users")
         .select("active_project_id")
@@ -189,6 +203,9 @@ def archive_project(user_id: str, project: str | None = None) -> str:
     if user and user[0].get("active_project_id") == proj["id"]:
         db.table("users").update({"active_project_id": None}).eq("id", user_id).execute()
 
+    closed = len(open_tasks)
+    if closed:
+        return f"Проект в архиве: {proj['name']}. Закрыто открытых задач: {closed}"
     return f"Проект в архиве: {proj['name']}"
 
 

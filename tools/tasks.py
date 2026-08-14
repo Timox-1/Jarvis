@@ -249,3 +249,56 @@ def get_today_summary(user_id: str) -> dict:
             "reminders_count": len(reminders),
         }
     }
+
+
+def format_day_snapshot(summary: dict, user_id: str) -> str:
+    """Compact DB snapshot for the system prompt — agent must not contradict this."""
+    overdue = summary.get("overdue") or []
+    today_tasks = summary.get("today") or []
+    reminders = summary.get("reminders_today") or []
+
+    lines = ["## Снимок из базы (истина — не выдумывай и не отрицай)"]
+
+    if not overdue and not today_tasks and not reminders:
+        lines.append("Просроченных задач нет. На сегодня задач нет. Напоминаний на сегодня нет.")
+        return "\n".join(lines)
+
+    project_ids = {
+        t.get("project_id")
+        for t in (*overdue, *today_tasks)
+        if t.get("project_id")
+    }
+    proj_by_id: dict[str, dict] = {}
+    if project_ids:
+        db = get_db()
+        rows = (
+            db.table("projects")
+            .select("id, name, status")
+            .in_("id", list(project_ids))
+            .execute()
+        ).data or []
+        proj_by_id = {r["id"]: r for r in rows}
+
+    if overdue:
+        lines.append(f"Просрочено ({len(overdue)}):")
+        for t in overdue[:10]:
+            extra = ""
+            pid = t.get("project_id")
+            if pid and pid in proj_by_id:
+                p = proj_by_id[pid]
+                extra = f", проект «{p['name']}»"
+                if p.get("status") == "archived":
+                    extra += " [архив]"
+            lines.append(f"- «{t['title']}» (срок {t['due_date']}{extra})")
+
+    if today_tasks:
+        lines.append(f"На сегодня ({len(today_tasks)}):")
+        for t in today_tasks[:10]:
+            lines.append(f"- «{t['title']}»")
+
+    if reminders:
+        lines.append(f"Напоминания сегодня ({len(reminders)}):")
+        for r in reminders[:5]:
+            lines.append(f"- «{r['text']}»")
+
+    return "\n".join(lines)

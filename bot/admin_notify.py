@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 _DENY_COOLDOWN_SEC = 6 * 3600
 _last_denied_at: dict[str, float] = {}
 
+_GUARD_COOLDOWN_SEC = 30 * 60
+_last_guard_at: dict[str, float] = {}
+
 
 def admin_telegram_ids() -> list[int]:
     return sorted({*ADMIN_TELEGRAM_IDS, *ALLOWED_TELEGRAM_IDS})
@@ -136,6 +139,35 @@ async def notify_onboarding_started(
         f"канал: {channel}\n"
         f"id: {external_id}{uname}\n"
         f"имя: {name or '—'}{plan_line}"
+    )
+    await notify_admins(text, bot=bot)
+
+
+async def notify_agent_guard(
+    *,
+    user_id: str,
+    reason: str,
+    user_message: str,
+    response: str,
+    delivery=None,
+    bot=None,
+) -> None:
+    """Alert admins when the agent claims success without mutating tools."""
+    key = f"{user_id}:{reason}"
+    now = time.time()
+    if now - _last_guard_at.get(key, 0.0) < _GUARD_COOLDOWN_SEC:
+        return
+    _last_guard_at[key] = now
+
+    channel = getattr(delivery, "channel", None) if delivery else None
+    external_id = getattr(delivery, "external_id", None) if delivery else None
+    text = (
+        f"⚠️ Агент: подозрение на ложный успех\n"
+        f"причина: {reason}\n"
+        f"user_id: {user_id}\n"
+        f"канал: {channel or '—'} id: {external_id or '—'}\n"
+        f"запрос: {user_message[:300]}\n"
+        f"ответ: {response[:400]}"
     )
     await notify_admins(text, bot=bot)
 

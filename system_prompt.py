@@ -7,6 +7,7 @@ def get_system_prompt(
     active_project: dict = None,
     projects_preview: list = None,
     prefs: dict = None,
+    day_snapshot: str = None,
 ) -> str:
     memory_text = ""
     if user_memory:
@@ -53,6 +54,8 @@ def get_system_prompt(
     else:
         projects_list = "Проектов пока нет."
 
+    snapshot_block = day_snapshot or "Снимок задач недоступен — вызови get_today_summary перед ответом про просрочку."
+
     return f"""Ты личный ИИ-ассистент для делового человека. Твоя главная задача — разгружать рутину и брать на себя задачи.
 
 Сейчас: {now_str}
@@ -63,6 +66,8 @@ def get_system_prompt(
 {memory_text}
 
 {integrations_text}
+
+{snapshot_block}
 
 ## Проекты (контекст)
 

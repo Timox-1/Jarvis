@@ -11,7 +11,7 @@ from tools.browser import (
 from tools.n8n import call_integration, list_integrations_for_user
 from tools.reminders import set_reminder, list_reminders, delete_reminder
 from tools.search import web_search
-from tools.tasks import add_task, list_tasks, complete_task, delete_task, get_today_summary, update_task
+from tools.tasks import add_task, list_tasks, complete_task, delete_task, get_today_summary, update_task, format_day_snapshot
 from tools.contacts import (
     add_contact, list_contacts, get_contact, update_contact, delete_contact,
     create_contact_group, list_contact_groups, add_contact_to_group, get_group_contacts
@@ -42,6 +42,54 @@ from tools.prefs import set_briefing_prefs, format_briefing_prefs, get_user_pref
 client = AsyncOpenAI(api_key=BOTHUB_API_KEY, base_url=BOTHUB_BASE_URL)
 
 MAX_TOOL_ROUNDS = 10
+
+_ACTION_MUTATING_TOOLS = frozenset({
+    "complete_task", "delete_task", "update_task", "add_task",
+    "archive_project", "delete_reminder", "set_reminder",
+})
+
+_ACTION_KEYWORDS = (
+    "\u0441\u0434\u0435\u043b\u0430\u043b", "\u0441\u0434\u0435\u043b\u0430\u043d\u043e", "\u0432\u044b\u043f\u043e\u043b\u043d",
+    "\u0437\u0430\u043a\u0440\u044b\u043b", "\u0437\u0430\u043a\u0440\u044b", "\u043e\u0442\u043c\u0435\u043d", "\u0443\u0434\u0430\u043b",
+    "\u0430\u0440\u0445\u0438\u0432", "\u043f\u0440\u043e\u0441\u0440\u043e\u0447", "\u0443\u0436\u0435 \u043d\u0435", "\u043d\u0435 \u043d\u0430\u043f\u043e\u043c\u0438\u043d",
+    "\u0433\u043e\u0442\u043e\u0432\u043e", "\u0432\u0441\u0451 \u0441\u0434\u0435\u043b", "\u0432\u0441\u0435 \u0441\u0434\u0435\u043b",
+)
+
+_SUCCESS_CLAIM_KEYWORDS = (
+    "\u0432\u044b\u043f\u043e\u043b\u043d\u0435\u043d", "\u0437\u0430\u043a\u0440\u044b\u043b", "\u0437\u0430\u043a\u0440\u044b\u0442",
+    "\u0443\u0434\u0430\u043b\u0435\u043d", "\u0443\u0434\u0430\u043b\u0438\u043b", "\u043e\u0442\u043c\u0435\u043d", "\u0437\u0430\u0430\u0440\u0445\u0438\u0432",
+    "\u0431\u043e\u043b\u044c\u0448\u0435 \u043d\u0435 \u0431\u0443\u0434\u0435\u0442", "\u0440\u0430\u0434, \u0447\u0442\u043e", "\u0433\u043e\u0442\u043e\u0432\u043e",
+)
+
+_DENIAL_KEYWORDS = (
+    "\u043f\u0440\u043e\u0441\u0440\u043e\u0447\u0435\u043d", "\u043d\u0435\u0442 \u0437\u0430\u0434\u0430\u0447", "\u0437\u0430\u0434\u0430\u0447\u0438 \u043d\u0435\u0442",
+    "\u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d", "\u043d\u0435 \u0432\u0438\u0436\u0443", "\u043d\u0438\u0447\u0435\u0433\u043e \u043d\u0435",
+)
+
+_GUARD_NUDGE = (
+    "\u26a0\ufe0f \u0421\u0438\u0441\u0442\u0435\u043c\u0430: \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044c \u043f\u0440\u043e\u0441\u0438\u043b \u0438\u0437\u043c\u0435\u043d\u0438\u0442\u044c \u0434\u0430\u043d\u043d\u044b\u0435, "
+    "\u043d\u043e \u0442\u044b \u043e\u0442\u0432\u0435\u0442\u0438\u043b \u0442\u0435\u043a\u0441\u0442\u043e\u043c \u0431\u0435\u0437 \u0432\u044b\u0437\u043e\u0432\u0430 \u0438\u043d\u0441\u0442\u0440\u0443\u043c\u0435\u043d\u0442\u0430. "
+    "\u0412\u044b\u0437\u043e\u0432\u0438 complete_task / delete_reminder / archive_project \u0438 \u0442.\u0434. \u041d\u0435 \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0430\u0439 \u0443\u0441\u043f\u0435\u0445 \u0431\u0435\u0437 \u0442\u0443\u043b\u0430."
+)
+
+
+def _user_wants_mutation(text: str) -> bool:
+    t = (text or "").lower()
+    return any(k in t for k in _ACTION_KEYWORDS)
+
+
+def _check_action_guard(user_message: str, response: str, tools_called: set[str], summary: dict | None) -> str | None:
+    if not _user_wants_mutation(user_message):
+        return None
+    if tools_called & _ACTION_MUTATING_TOOLS:
+        return None
+    t = (response or "").lower()
+    if any(k in t for k in _SUCCESS_CLAIM_KEYWORDS):
+        return "success_without_tool"
+    overdue = (summary or {}).get("overdue") or []
+    if overdue and any(k in t for k in _DENIAL_KEYWORDS) and ("\u043d\u0435\u0442" in t or "\u043d\u0435 " in t):
+        return "denied_open_items_without_tool"
+    return None
 
 
 def _user_wants_screenshot(text: str) -> bool:
@@ -458,17 +506,23 @@ async def run_agent(user_id: str, user_message: str, history: list[dict], delive
     active_project = get_active_project(user_id)
     projects_preview = list_projects_preview(user_id)
     prefs = get_user_prefs(user_id)
+    day_summary = get_today_summary(user_id)
+    day_snapshot = format_day_snapshot(day_summary, user_id)
     system_prompt = get_system_prompt(
         memory,
         integrations,
         active_project=active_project,
         projects_preview=projects_preview,
         prefs=prefs,
+        day_snapshot=day_snapshot,
     )
 
     messages = [{"role": "system", "content": system_prompt}]
     messages.extend(history)
     messages.append({"role": "user", "content": user_message})
+
+    tools_called: set[str] = set()
+    guard_retried = False
 
     for _ in range(MAX_TOOL_ROUNDS):
         response = await client.chat.completions.create(
@@ -482,12 +536,33 @@ async def run_agent(user_id: str, user_message: str, history: list[dict], delive
         msg = response.choices[0].message
 
         if not msg.tool_calls:
-            return msg.content or ""
+            content = msg.content or ""
+            guard_reason = _check_action_guard(
+                user_message, content, tools_called, day_summary,
+            )
+            if guard_reason and not guard_retried:
+                guard_retried = True
+                messages.append({"role": "assistant", "content": content})
+                messages.append({"role": "system", "content": _GUARD_NUDGE})
+                continue
+
+            if guard_reason:
+                from bot.admin_notify import notify_agent_guard
+                await notify_agent_guard(
+                    user_id=user_id,
+                    reason=guard_reason,
+                    user_message=user_message,
+                    response=content,
+                    delivery=delivery,
+                )
+
+            return content
 
         messages.append(msg)
 
         for tool_call in msg.tool_calls:
             tool_name = tool_call.function.name
+            tools_called.add(tool_name)
             args = json.loads(tool_call.function.arguments)
 
             tool_result = await _execute_tool(tool_name, args, user_id, delivery)
