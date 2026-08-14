@@ -1,6 +1,6 @@
 # Джарвис — личный ИИ-ассистент в Telegram
 
-Бот на GPT-4o, который не отвечает, а **делает**: ведёт задачи, шлёт напоминания, читает и пишет почту, правит календарь, считает деньги, ходит по сайтам в headless-браузере. Управление — обычным языком, текстом или голосом.
+Бот на GPT (сейчас `gpt-4.1-mini` через BotHub; vision/Whisper отдельно), который не отвечает, а **делает**: ведёт задачи и проекты, шлёт напоминания, читает и пишет почту, правит календарь, считает деньги, ходит по сайтам в headless-браузере. Управление — обычным языком, текстом или голосом. Multi-user: инвайты, Telegram + VK.
 
 Бот: [@Jarvis_yopta_bot](https://t.me/Jarvis_yopta_bot) · Прод: VPS Timeweb, Docker · Автодеплой: push в `main`
 
@@ -16,10 +16,10 @@ bot/handlers.py     проверяет whitelist, транскрибирует �
   ↓
 bot/agent.py        собирает контекст: system prompt + долгая память + 20 последних сообщений
   ↓
-GPT-4o (BotHub)     решает: ответить словами или вызвать инструмент
+GPT (BotHub)        решает: ответить словами или вызвать инструмент
   ↓                 ↑
-tools/              39 инструментов: задачи, напоминания, календарь, почта,
-                    контакты, рассылки, финансы, браузер, поиск, n8n
+tools/              52 инструмента: задачи, проекты, напоминания, календарь, почта,
+                    контакты, рассылки, финансы, браузер, поиск, n8n, prefs
   ↓                 └── результат возвращается модели, она думает дальше (до 10 кругов)
   ↓
 Telegram            ответ пользователю
@@ -48,12 +48,17 @@ Supabase            диалог пишется в messages
 
 ---
 
-## Что умеет — 39 инструментов
+## Что умеет — 52 инструмента
+
+### Проекты (dump-and-sort)
+`create_project` · `list_projects` · `set_active_project` · `clear_active_project` · `archive_project` · `rename_project` · `add_project_note` · `list_project_notes` · `get_project_summary`
+
+Универсальный контейнер (клиент / сделка / объект). Создал проект → кидаешь сырую инфу → агент раскладывает по задачам, расходам, контактам, напоминаниям и пишет в лог заметок проекта. Активный проект подмешивается в system prompt. Создание проекта нельзя «подтвердить словами» без вызова `create_project`.
 
 ### Задачи
 `add_task` · `list_tasks` · `complete_task` · `delete_task` · `update_task` · `get_today_summary`
 
-Срок, время, приоритет (`low` / `normal` / `high` / `urgent`), статус. Сводка дня = сегодня + просроченное + напоминания.
+Срок, время, приоритет (`low` / `normal` / `high` / `urgent`), статус, опционально привязка к проекту. Сводка дня = сегодня + просроченное + напоминания.
 
 ### Напоминания
 `set_reminder` · `list_reminders` · `delete_reminder`
@@ -84,14 +89,17 @@ Supabase            диалог пишется в messages
 «Потратил 450 на такси и 1200 в пятёрочке» — разберёт на две траты и разложит по категориям сам. P&L: доходы − расходы за период.
 
 ### Браузер (Playwright, headless Chromium)
-`browser_navigate` · `browser_click` · `browser_type` · `browser_press` · `browser_get_text`
+`browser_navigate` · `browser_click` · `browser_type` · `browser_press` · `browser_get_text` · `browser_send_screenshot`
 
-Видит страницу глазами GPT-4o (скриншот → vision), кликает по координатам. Капча или 2FA — спросит в чате.
+Видит страницу через vision (скриншот → модель), кликает по координатам. Капча или 2FA — спросит в чате. `browser_send_screenshot` шлёт PNG в чат; если в сообщении есть «скрин», фото уходит и после обычного `browser_navigate`.
+
+### Утренний брифинг (prefs)
+`set_briefing_prefs` · `get_briefing_prefs`
+
+Время сводки и таймзона на пользователя (не только «09:00 Кемерово на всех»).
 
 ### Прочее
 `web_search` (DuckDuckGo, без ключа) · `save_memory` · `forget_memory` · `list_integrations` · `call_integration` (произвольный n8n webhook)
-
-**Скриншоты:** `browser_navigate` — скрин для vision модели; `browser_send_screenshot` — PNG в Telegram. Если пользователь просит «скрин», фото уходит автоматически даже после `browser_navigate`.
 
 ### Команды
 
@@ -124,7 +132,7 @@ Supabase            диалог пишется в messages
 
 - **Python 3.11** (`python:3.11-slim` в Docker)
 - **python-telegram-bot** ≥21 — long polling
-- **GPT-4o** через [BotHub](https://bothub.chat) (OpenAI-совместимый API) — чат, vision, Whisper
+- **GPT через [BotHub](https://bothub.chat)** (OpenAI-совместимый API) — чат (`gpt-4.1-mini`), vision, Whisper/AssemblyAI для голоса
 - **Supabase** (PostgreSQL) — вся персистентность
 - **Playwright** — headless Chromium
 - **caldav** + **icalendar** — Яндекс Календарь
