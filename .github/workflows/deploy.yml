@@ -1,34 +1,11 @@
-name: Deploy to VPS
+name: Deploy to VPS (disabled)
 
+# Public repo is a frozen hiring case. Live deploy: Timox-1/jarvis-os
 on:
-  push:
-    branches: [main]
-  workflow_dispatch:  # Manual trigger
+  workflow_dispatch:
 
 jobs:
-  deploy:
+  skipped:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            set -e
-            cd /opt/jarvis
-            git pull origin main
-            docker builder prune -f
-            docker compose up -d --build
-            docker image prune -f
-
-            # The container must be running the code we just pulled, not a stale image
-            sleep 5
-            if [ -z "$(docker compose ps --status running --quiet bot)" ]; then
-              echo "DEPLOY FAILED: bot container is not running"
-              docker compose logs --tail 40 bot
-              exit 1
-            fi
-            echo "Deployed $(git rev-parse --short HEAD) — bot is running"
+      - run: echo "Deploy moved to private Timox-1/jarvis-os. This public repo is a frozen case snapshot (tag case-2026-08)."

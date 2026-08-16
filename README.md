@@ -1,8 +1,10 @@
 # Джарвис — личный ИИ-ассистент в Telegram
 
+> **Кейс / snapshot.** Этот публичный репозиторий заморожен тегом [`case-2026-08`](https://github.com/Timox-1/Jarvis/releases/tag/case-2026-08) как портфолио (MVP, 52 инструмента). Живая разработка — в private-репо, автодеплой отсюда выключен.
+
 Бот на GPT (сейчас `gpt-4.1-mini` через BotHub; vision/Whisper отдельно), который не отвечает, а **делает**: ведёт задачи и проекты, шлёт напоминания, читает и пишет почту, правит календарь, считает деньги, ходит по сайтам в headless-браузере. Управление — обычным языком, текстом или голосом. Multi-user: инвайты, Telegram + VK.
 
-Бот: [@Jarvis_yopta_bot](https://t.me/Jarvis_yopta_bot) · Прод: VPS Timeweb, Docker · Автодеплой: push в `main`
+Бот: [@Jarvis_yopta_bot](https://t.me/Jarvis_yopta_bot) · Прод: VPS Timeweb, Docker
 
 ---
 
